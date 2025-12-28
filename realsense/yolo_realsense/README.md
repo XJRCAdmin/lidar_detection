@@ -42,7 +42,27 @@ onnx中间模型,推理用时:
 [yolo_realsense_node-2] [INFO] [1766918562.390098225] [yolov11_node]: YOLO Time: Total 119.22ms (Pre: 9.91ms, Infer: 107.64ms, Post: 1.67ms)
 ```
 
+
 根据推理引擎的不同可以进一步优化推理速度，比如使用OpenVINO、TensorRT等。由于当前的主机并非Jetson Orin/xavier NX,因而选择将模型保留到onnx这一步,后续可以在进行优化(转一下模型格式即可).在intel NUC上将模型量化为`.bin .xml`格式时,推理速度可以达到50ms以内.
+
+```
+[训练框架]
+ PyTorch | TensorFlow | JAX | Paddle
+        │
+        │ export
+        ▼
+     ONNX（中立模型格式）
+        │
+        │ import / compile
+        ▼
+[推理引擎 / 编译器]
+ ONNX Runtime | TensorRT | OpenVINO | TVM | NCNN
+        │
+        ▼
+[硬件]
+ CPU | NVIDIA GPU | AMD GPU | Intel | ARM | NPU | FPGA
+
+```
 
 图片通过rivz2显示,如下(有时会出现rviz的段错误退出,可以在launch文件中先注释掉rviz节点,再另起一个终端rviz2):
 ![rviz](static/rviz.png)
