@@ -1,2 +1,3 @@
 ultralytics
 pyrealsense2
+openvino

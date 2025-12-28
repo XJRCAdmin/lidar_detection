@@ -6,7 +6,7 @@ from rclpy.qos import ReliabilityPolicy, QoSProfile
 # Executor and callback imports
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-
+import onnxruntime as ort
 # ROS2 interfaces
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import String
@@ -19,17 +19,24 @@ from ultralytics import YOLO
 import numpy as np
 import open3d as o3d
 import time, json, torch
-
+import cv2
 class Yolov11Node(Node):
     
     def __init__(self):
         super().__init__("yolov11_node")
         rclpy.logging.set_logger_level('yolov11_node', rclpy.logging.LoggingSeverity.INFO)
         
-        ## Declare parameters for node
-        self.declare_parameter("model", "yolov11s.pt")
-        model = self.get_parameter("model").get_parameter_value().string_value
+        self.declare_parameter("model_type", "onnx")
+        self.model_type = self.get_parameter("model_type").get_parameter_value().string_value
         
+        if self.model_type == "onnx":
+            ## Declare parameters for node
+            self.declare_parameter("model", "yolov11s.onnx") # yolov11s.pt or yolov11s.onnx
+        else:
+            self.declare_parameter("model", "yolov11s.pt") # yolov11s.pt or yolov11s.onnx
+        
+        model = self.get_parameter("model").get_parameter_value().string_value
+
         self.declare_parameter("device", "cuda:0")
         self.device = self.get_parameter("device").get_parameter_value().string_value
         
@@ -55,11 +62,14 @@ class Yolov11Node(Node):
         self.group_2 = MutuallyExclusiveCallbackGroup() # vision timer
         
         self.cv_bridge = CvBridge()
-        self.yolo = YOLO(model)
-        self.yolo.fuse() # Conv2d and BatchNorm2d Layer Fusion:
-                         # Conv2d layers are often followed by BatchNorm2d layers in deep neural networks.
-                         # Fusing these layers means combining the operations of the convolutional layer and the batch normalization layer into a single operation.
-                         # This can reduce the computational cost and improve inference speed.
+        self.yolo = YOLO(model,task="detect")
+        
+        if self.model_type == "pt":
+            self.yolo.fuse() # Conv2d and BatchNorm2d Layer Fusion:
+                             # Conv2d layers are often followed by BatchNorm2d layers in deep neural networks.
+                             # Fusing these layers means combining the operations of the convolutional layer and the batch normalization layer into a single operation.
+                             # This can reduce the computational cost and improve inference speed.
+        
         self.color_image_msg = None
         self.depth_image_msg = None
         self.camera_intrinsics = None
@@ -118,6 +128,15 @@ class Yolov11Node(Node):
             # Convert depth image msg
             cv_depth_image = self.cv_bridge.imgmsg_to_cv2(depth_img_msg, desired_encoding='passthrough')
             np_depth_image = np.array(cv_depth_image, dtype=np.uint16)
+            
+             # Get image dimensions
+            color_height, color_width, _ = np_color_image.shape
+            depth_height, depth_width = np_depth_image.shape
+            
+            if color_height != depth_height or color_width != depth_width:
+                # Resize depth image to match color image dimensions
+                np_depth_image = cv2.resize(np_depth_image, (color_width, color_height), interpolation=cv2.INTER_NEAREST)
+                self.get_logger().info(f"Resized depth image from ({depth_width}, {depth_height}) to ({color_width}, {color_height}) to match color image")
 
             # bg removal
             grey_color = 153
@@ -190,7 +209,8 @@ class Yolov11Node(Node):
                 
                 # Extract image with yolo predictions
                 pred_img = detection.plot()
-                self.pred_image_msg = self.cv_bridge.cv2_to_imgmsg(pred_img, encoding='passthrough')
+                self.pred_image_msg = self.cv_bridge.cv2_to_imgmsg(pred_img, encoding='bgr8')
+                self.pred_image_msg.header = self.color_image_msg.header
                 self._pred_pub.publish(self.pred_image_msg)
                 
                 # Get number of objects in the scene

@@ -16,7 +16,7 @@ def generate_launch_description():
     model_path = os.path.join(
         get_package_share_directory(this_package_name),
         'models',
-        'yolov11s.pt'
+        'yolov11s.onnx'
     )
     rviz_path = os.path.join(
         get_package_share_directory(this_package_name),
@@ -28,7 +28,7 @@ def generate_launch_description():
     rs_camera = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory(realsense_package_name), 'launch', 'rs_launch.py'
-        )]), launch_arguments={'align_depth.enable': 'true','bg_removal.enable': 'true'}.items()
+        )]), launch_arguments={'align_depth.enable': 'true'}.items()
     )
     
     
@@ -41,6 +41,8 @@ def generate_launch_description():
         parameters=[
             {'device': f'{torch_device}'},
             {'model': model_path},  
+            {'enable_bg_removal': True},
+            {'model_type': 'onnx'}
         ],
     )
     rviz_node = Node(
