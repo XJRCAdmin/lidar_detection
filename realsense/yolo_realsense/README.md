@@ -1,3 +1,5 @@
+# YOLO + RealSense D435i ROS2 node
+![](static/rviz3.png)
 首先安装[realsense sdk2](https://github.com/vanderbiltrobotics/realsense-ros?tab=readme-ov-file#step-2-install-librealsense2).
 
 一些依赖:
@@ -32,3 +34,6 @@ onnx中间模型,推理用时:
 ```
 
 根据推理引擎的不同可以进一步优化推理速度，比如使用OpenVINO、TensorRT等。由于当前的主机并非Jetson Orin/xavier NX,因而选择将模型保留到onnx这一步,后续可以在进行优化(转一下模型格式即可).在intel NUC上将模型量化为`.bin .xml`格式时,推理速度可以达到50ms以内.
+
+图片通过rivz2显示,如下:
+![rviz](static/rviz.png)

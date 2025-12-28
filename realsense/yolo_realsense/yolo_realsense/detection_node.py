@@ -83,6 +83,8 @@ class Yolov11Node(Node):
         # Publishers
         self._item_dict_pub = self.create_publisher(String, "/yolo/prediction/item_dict", 10)
         self._pred_pub = self.create_publisher(Image, "/yolo/prediction/image", 10)
+
+        self._depth_pred_pub = self.create_publisher(Image, "/yolo/prediction/depth_image", 10) 
         
         # Subscribers
         self._color_image_sub = self.create_subscription(Image, "/camera/color/image_raw", self.color_image_callback, qos_profile_sensor_data, callback_group=self.group_1)
@@ -129,7 +131,7 @@ class Yolov11Node(Node):
             cv_depth_image = self.cv_bridge.imgmsg_to_cv2(depth_img_msg, desired_encoding='passthrough')
             np_depth_image = np.array(cv_depth_image, dtype=np.uint16)
             
-             # Get image dimensions
+            # Get image dimensions
             color_height, color_width, _ = np_color_image.shape
             depth_height, depth_width = np_depth_image.shape
             
@@ -212,7 +214,7 @@ class Yolov11Node(Node):
                 self.pred_image_msg = self.cv_bridge.cv2_to_imgmsg(pred_img, encoding='bgr8')
                 self.pred_image_msg.header = self.color_image_msg.header
                 self._pred_pub.publish(self.pred_image_msg)
-                
+
                 # Get number of objects in the scene
                 object_boxes = detection.boxes.xyxy.cpu().numpy()
                 n_objects = object_boxes.shape[0]
@@ -295,13 +297,11 @@ class Yolov11Node(Node):
                 item_dict_msg.data = self.item_dict_str
                 self._item_dict_pub.publish(item_dict_msg)
                 
-                self.get_logger().debug("Item dictionary succesfully created and published")
-            
-            
+                self.get_logger().info("Item dictionary succesfully created and published")
+
             
     def shutdown_callback(self):
         self.get_logger().warn("Shutting down...")
-        
         
 
 def main(args=None):
@@ -328,3 +328,4 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+

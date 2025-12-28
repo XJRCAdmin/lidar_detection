@@ -41,7 +41,7 @@ def generate_launch_description():
         parameters=[
             {'device': f'{torch_device}'},
             {'model': model_path},  
-            {'enable_bg_removal': True},
+            {'enable_bg_removal': False},
             {'model_type': 'onnx'}
         ],
     )

@@ -1,9 +1,11 @@
 import torch
 from ament_index_python import get_package_share_directory
 import os
-torch_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 from launch import LaunchDescription
 from launch_ros.actions import Node
+
+
+torch_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def generate_launch_description():
     this_package_name='yolo_realsense'
@@ -20,6 +22,9 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'device': f'{torch_device}'},
+            {'model': model_path},  
+            {'enable_bg_removal': True},
+            {'model_type': 'pt'}
         ],
     )
     
