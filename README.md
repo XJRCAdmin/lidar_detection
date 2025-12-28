@@ -17,3 +17,4 @@ colcon build \
 
 - [lidarDetection README](lidarDetection/README.md)
 - [CHANGELOG](lidarDetection/CHANGELOG.md)
+- [yolo_realsense README](yolo_realsense/README.md)
