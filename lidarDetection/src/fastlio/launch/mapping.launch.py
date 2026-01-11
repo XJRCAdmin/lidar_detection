@@ -57,13 +57,25 @@ def generate_launch_description():
         condition=IfCondition(rviz_use)
     )
 
+    lidar_body_to_livox_frame = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='lidar_body_to_livox_frame_publisher',
+        output='screen',
+        arguments=[
+            # x, y, z, roll, pitch, yaw, parent_frame, child_frame
+            '0', '0', '0', '0', '0', '0', 'lidar_body', 'livox_frame'
+        ]
+    )
+
+
     ld = LaunchDescription()
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_config_path_cmd)
     ld.add_action(decalre_config_file_cmd)
     ld.add_action(declare_rviz_cmd)
     ld.add_action(declare_rviz_config_path_cmd)
-
+    ld.add_action(lidar_body_to_livox_frame)
     ld.add_action(fast_lio_node)
     # ld.add_action(rviz_node)
 

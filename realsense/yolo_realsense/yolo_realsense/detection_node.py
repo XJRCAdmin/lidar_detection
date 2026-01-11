@@ -30,13 +30,16 @@ class Yolov11Node(Node):
         self.model_type = self.get_parameter("model_type").get_parameter_value().string_value
         
         if self.model_type == "onnx":
-            ## Declare parameters for node
-            self.declare_parameter("model", "yolov11s.onnx") # yolov11s.pt or yolov11s.onnx
+            default_model = "yolov11s.onnx"
+        elif self.model_type == "xml":
+            default_model = "openvino"
         else:
-            self.declare_parameter("model", "yolov11s.pt") # yolov11s.pt or yolov11s.onnx
-        
-        model = self.get_parameter("model").get_parameter_value().string_value
+            default_model = "yolov11s.pt"
+        if not self.has_parameter("model"):
+            self.declare_parameter("model", default_model)
 
+        model = self.get_parameter("model").get_parameter_value().string_value
+        print(f"Using model: {model}")
         self.declare_parameter("device", "cuda:0")
         self.device = self.get_parameter("device").get_parameter_value().string_value
         
@@ -88,7 +91,7 @@ class Yolov11Node(Node):
         
         # Subscribers
         self._color_image_sub = self.create_subscription(Image, "/camera/color/image_raw", self.color_image_callback, qos_profile_sensor_data, callback_group=self.group_1)
-        self._depth_image_sub = self.create_subscription(Image, "/camera/aligned_depth_to_color/image_raw", self.depth_image_callback, qos_profile_sensor_data, callback_group=self.group_1)
+        self._depth_image_sub = self.create_subscription(Image, "/camera/depth/image_rect_raw", self.depth_image_callback, qos_profile_sensor_data, callback_group=self.group_1)
         self._camera_info_subscriber = self.create_subscription(CameraInfo, '/camera/color/camera_info', self.camera_info_callback, QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE), callback_group=self.group_1)
 
         # Timers
@@ -172,7 +175,9 @@ class Yolov11Node(Node):
     
     
     def object_segmentation(self):
+        self.get_logger().info(f"enable_yolo: {self.enable_yolo} , color_image_msg: {self.color_image_msg is not None} , depth_image_msg: {self.depth_image_msg is not None}")
         if self.enable_yolo and self.color_image_msg is not None and self.depth_image_msg is not None:
+
             self.get_logger().info("Succesfully acquired color and depth image msgs")
             if self.enable_bg_removal == False:
                 yolo_input = self.cv_bridge.imgmsg_to_cv2(self.color_image_msg, 'bgr8')

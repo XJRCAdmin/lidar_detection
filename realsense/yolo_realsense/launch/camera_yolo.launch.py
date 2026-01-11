@@ -16,7 +16,7 @@ def generate_launch_description():
     model_path = os.path.join(
         get_package_share_directory(this_package_name),
         'models',
-        'yolov11s.onnx'
+        'yolo11n.onnx'
     )
     rviz_path = os.path.join(
         get_package_share_directory(this_package_name),
@@ -56,5 +56,5 @@ def generate_launch_description():
     return LaunchDescription([
         rs_camera,
         yolov11_node,
-        rviz_node
+    #   rviz_node
     ])

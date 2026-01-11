@@ -14,7 +14,11 @@ colcon build \
   -DCMAKE_BUILD_TYPE=Debug
 ```
 
+## 记录rosbag
 
+```bash
+ros2 bag record -s mcap -a -o my_mcap_bag
+```
 - [lidarDetection README](lidarDetection/README.md)
 - [CHANGELOG](lidarDetection/CHANGELOG.md)
 - [yolo_realsense README](realsense/yolo_realsense/README.md)

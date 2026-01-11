@@ -43,9 +43,9 @@ int STATISTICAL_NB_NEIGHBORS;
 double STATISTICAL_STD_RATIO;
 
 bool ENABLE_HEIGHT_RANGE_FILTER;
-double HEIGHT_LIMIT;
-double LENGTH;
-double WIDTH;
+double GROUND_DISTANCE_THRESH;
+double MIN_HEIGHT_AND_LONGEST_EDGE_RATIO;
+double BOX_MAX_LENGTH_THRESHOLD;
 
 class ObstacleDetectorNode : public rclcpp::Node
 {
@@ -99,8 +99,7 @@ private:
   pcl::PointCloud<pcl::PointXYZ>::Ptr applyStatisticalOutlierFilter(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr & input_cloud);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr applyHeightAndRangeFilter(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr & input_cloud);
+  bool applyHeightAndRangeFilter(const Box & box);
 
   std::vector<geometry_msgs::msg::Point32> selectRepresentativeCorners(
     const std::vector<geometry_msgs::msg::Point32> & all_points, const Eigen::Vector3f & position,
@@ -182,6 +181,9 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   this->declare_parameter<double>("height_limit", 2.0);
   this->declare_parameter<double>("range_length", 5.0);
   this->declare_parameter<double>("range_width", 5.0);
+  this->declare_parameter<double>("ground_distance_threshold", 1.8);
+  this->declare_parameter<double>("min_height_and_longest_edge_ratio", 0.1);
+  this->declare_parameter<double>("box_max_length_threshold", 3.0);
 
   // Read initial dynamic parameters into globals
   this->get_parameter("rotate_x", ROTATE_X);
@@ -218,9 +220,9 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   this->get_parameter("statistical_std_ratio", STATISTICAL_STD_RATIO);
 
   this->get_parameter("enable_height_range_filter", ENABLE_HEIGHT_RANGE_FILTER);
-  this->get_parameter("height_limit", HEIGHT_LIMIT);
-  this->get_parameter("range_length", LENGTH);
-  this->get_parameter("range_width", WIDTH);
+  this->get_parameter("ground_distance_threshold", GROUND_DISTANCE_THRESH);
+  this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
+  this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
   // Register parameter change callback (replacement for dynamic_reconfigure)
   param_cb_handle_ = this->add_on_set_parameters_callback(
@@ -269,9 +271,9 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
       this->get_parameter("statistical_std_ratio", STATISTICAL_STD_RATIO);
 
       this->get_parameter("enable_height_range_filter", ENABLE_HEIGHT_RANGE_FILTER);
-      this->get_parameter("height_limit", HEIGHT_LIMIT);
-      this->get_parameter("range_length", LENGTH);
-      this->get_parameter("range_width", WIDTH);
+      this->get_parameter("ground_distance_threshold", GROUND_DISTANCE_THRESH);
+      this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
+      this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
       return result;
     });
@@ -357,6 +359,15 @@ void ObstacleDetectorNode::odomCallback(const nav_msgs::msg::Odometry::ConstShar
   veh_course_ = tf2::getYaw(odom->pose.pose.orientation);
 }
 
+/**
+ * @brief 发布分割后的点云数据（地面和障碍物）
+ * 
+ * 该函数接收分割后的点云对（障碍物云和地面云）和消息头，将PCL点云转换为ROS消息格式，
+ * 并通过对应的发布器发布出去。同时会记录发布的点云信息日志。
+ * 
+ * @param segmented_clouds 右值引用的点云对，包含障碍物云(第一个元素)和地面云(第二个元素)
+ * @param header 点云数据的消息头，包含时间戳和坐标系信息
+ */
 void ObstacleDetectorNode::publishClouds(
   std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> && segmented_clouds,
   const std_msgs::msg::Header & header)
@@ -398,7 +409,16 @@ void ObstacleDetectorNode::publishClouds(
     ground_cloud->width * ground_cloud->height, obstacle_cloud->width * obstacle_cloud->height,
     header.frame_id.c_str());
 }
-
+/**
+ * @brief 发布检测到的障碍物信息，包括边界框标记和检测对象数组
+ * 
+ * 该函数接收点云簇和对应的凸包簇，为每个障碍物构建边界框，
+ * 可选地进行障碍物跟踪，并将结果发布为ROS标记和自定义检测消息。
+ * 
+ * @param cloud_clusters 右值引用的点云簇向量，每个元素代表一个障碍物的点云
+ * @param convex_clusters 右值引用的凸包簇向量，每个元素代表对应障碍物点云的凸包
+ * @param header 点云数据的消息头，包含时间戳和坐标系信息
+ */
 void ObstacleDetectorNode::publishDetectedObjects(
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> && cloud_clusters,
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> && convex_clusters, const std_msgs::msg::Header & header)
@@ -411,7 +431,6 @@ void ObstacleDetectorNode::publishDetectedObjects(
 
     Box box = USE_PCA_BOX ? obstacle_detector->pcaBoundingBox(cluster, obstacle_id_)
                           : obstacle_detector->axisAlignedBoundingBox(cluster, obstacle_id_);
-
     // RCLCPP_INFO(
     //   this->get_logger(),
     //   "Created Box ID %zu: position=(%.2f,%.2f,%.2f), dimension=(%.2f,%.2f,%.2f), cluster_points=%zu", obstacle_id_,
@@ -435,6 +454,11 @@ void ObstacleDetectorNode::publishDetectedObjects(
       representative_corners.push_back(representative_corners.front());
     }
     box = Box(obstacle_id_, box.position, box.dimension, box.quaternion, representative_corners);
+
+    if (applyHeightAndRangeFilter(box)) {
+      continue;
+    }
+
     if (obstacle_id_ < std::numeric_limits<size_t>::max()) {
       obstacle_id_ += 1;
     } else {
@@ -576,49 +600,53 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::applyStatisticalOutlie
   }
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr ObstacleDetectorNode::applyHeightAndRangeFilter(
-  const pcl::PointCloud<pcl::PointXYZ>::Ptr & input_cloud)
+bool ObstacleDetectorNode::applyHeightAndRangeFilter(const Box & box)
 {
   if (!ENABLE_HEIGHT_RANGE_FILTER) {
     RCLCPP_DEBUG(this->get_logger(), "Height and range filter disabled");
-    return input_cloud;
+    return false;  // 不进行过滤
   }
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  const float h = box.dimension[2];
+  const float longest = std::max({box.dimension[0], box.dimension[1], box.dimension[2]});
 
-  size_t height_filtered = 0;
-  size_t range_filtered = 0;
-  size_t total_kept = 0;
-
-  for (const auto & point : input_cloud->points) {
-    bool keep_point = true;
-
-    if (point.z < HEIGHT_LIMIT) {
-      height_filtered++;
-      keep_point = false;
-    }
-
-    if (keep_point && (point.x < -LENGTH / 2 || point.x > LENGTH / 2 || point.y < -WIDTH / 2 || point.y > WIDTH / 2)) {
-      range_filtered++;
-      keep_point = false;
-    }
-
-    if (keep_point) {
-      filtered_cloud->points.push_back(point);
-      total_kept++;
-    }
+  // 高度太矮（相对最长边），滤掉
+  if (h < static_cast<float>(MIN_HEIGHT_AND_LONGEST_EDGE_RATIO) * longest) {
+    RCLCPP_DEBUG(
+      this->get_logger(), "Filter box(id=%d): height %.2f < %.2f * longest_edge %.2f", box.id, h,
+      MIN_HEIGHT_AND_LONGEST_EDGE_RATIO, longest);
+    return true;
   }
-  filtered_cloud->width = static_cast<uint32_t>(filtered_cloud->points.size());
-  filtered_cloud->height = 1;
-  filtered_cloud->is_dense = true;
 
-  RCLCPP_INFO(
-    this->get_logger(),
-    "Height&Range filter: %zu->%zu pts (height_reject=%zu, range_reject=%zu, height=[%.1f], range=[%.1fx%.1f])",
-    input_cloud->size(), total_kept, height_filtered, range_filtered, HEIGHT_LIMIT, LENGTH, WIDTH);
-  return filtered_cloud;
+  // 离地太远（底面 z 与地面距离大于阈值），滤掉
+  const float bottom_z = box.position(2) - h / 2.0f;
+  if (bottom_z > static_cast<float>(GROUND_DISTANCE_THRESH)) {
+    RCLCPP_INFO(
+      this->get_logger(), "Filter box(id=%d): bottom_z %.2f > ground_distance_thresh %.2f", box.id, bottom_z,
+      GROUND_DISTANCE_THRESH);
+    return true;
+  }
+
+  if (longest > static_cast<float>(BOX_MAX_LENGTH_THRESHOLD)) {
+    RCLCPP_INFO(
+      this->get_logger(), "Filter box(id=%d): longest edge %.2f > box_max_length_threshold %.2f", box.id, longest,
+      BOX_MAX_LENGTH_THRESHOLD);
+    return true;
+  }
+  return false;
 }
-
+/**
+ * @brief 创建并返回一个包含多种障碍物可视化标记的标记数组
+ * 
+ * 该函数接收障碍物边界框信息、消息头和转换后的位姿，
+ * 调用三个辅助函数分别创建足迹/立方体标记、速度箭头标记和文本标记，
+ * 并将这些标记组合成一个标记数组返回。
+ * 
+ * @param box 障碍物边界框对象的引用，包含位置、尺寸、旋转等信息
+ * @param header 消息头，包含时间戳和坐标系信息，用于所有创建的标记
+ * @param pose_transformed 转换后的位姿信息，用于标记在目标坐标系中的定位
+ * @return visualization_msgs::msg::MarkerArray 包含多种障碍物可视化标记的数组
+ */
 visualization_msgs::msg::MarkerArray ObstacleDetectorNode::transformMarker(
   const Box & box, const std_msgs::msg::Header & header, const geometry_msgs::msg::Pose & pose_transformed)
 {
@@ -668,6 +696,17 @@ lidar_detection::msg::ObstacleDetection ObstacleDetectorNode::boxToDetection3D(
   return obstacle_detection;
 }
 
+/**
+ * @brief 计算边界框在全局坐标系中的8个顶点坐标
+ * 
+ * 该函数接收边界框的位置、尺寸和旋转四元数，首先在局部坐标系下定义边界框的8个顶点，
+ * 然后通过四元数旋转和位置平移将这些顶点转换到全局坐标系中，最后返回转换后的顶点列表。
+ * 
+ * @param position 边界框中心点在全局坐标系中的位置 (x, y, z)
+ * @param dimension 边界框的尺寸 (长度, 宽度, 高度)，分别对应x, y, z轴方向的尺寸
+ * @param quaternion 边界框的旋转四元数，用于表示边界框在全局坐标系中的朝向
+ * @return std::vector<geometry_msgs::msg::Point32> 包含8个顶点的向量，每个顶点在全局坐标系中的位置
+ */
 std::vector<geometry_msgs::msg::Point32> ObstacleDetectorNode::calculateBoxVertices(
   const Eigen::Vector3f & position, const Eigen::Vector3f & dimension, const Eigen::Quaternionf & quaternion)
 {

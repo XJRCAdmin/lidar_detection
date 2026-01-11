@@ -125,7 +125,6 @@ public:
         best_index = i;
       }
     }
-    // 填充并发布消息
     const auto & best_detection = ball_msg->detections[best_index];
     sensing_msgs::msg::BallRelative msg;
     msg.header = best_detection.detection.header;

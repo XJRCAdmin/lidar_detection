@@ -28,7 +28,7 @@ private:
   std::string source_frame_;
   std::string target_frame_;
   std::string transition_frame_;
-  double static_velocity_thresh_ = 0.01;
+  double static_velocity_thresh_;
   rclcpp::Subscription<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr obstacle_lidar_sub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr static_obstacle_to_baselink_pub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr dynamic_obstacle_to_baselink_pub_;

@@ -23,22 +23,24 @@ def generate_launch_description():
         name='lidar_body_to_base_link_publisher',
         output='screen',
         arguments=[
-            # x, y, z, roll, pitch, yaw, parent_frame, child_frame
-            '-0.1', '0', '-0.2', '0', '0', '0', 'lidar_body', 'base_link'
+            # x, y, z, roll, pitch, yaw, parent_frame, child_frame 在官方的unitree go2 到lidar的位置上取了逆变换
+        '-0.164144', '0.0', '-0.120308', '0.0', '-0.2268928', '0.0', 'lidar_body', 'base_link'
         ]
     )
     
     # static transform: map -> odom
-    static_tf_odom_to_map = Node(
+    static_tf_map_to_odom = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='odom_to_map_publisher',
+        name='map_to_odom_publisher',
         output='screen',
         arguments=[
-            # x, y, z, roll, pitch, yaw, parent_frame, child_frame
-            '0', '0', '0', '0', '0', '0', 'map', 'odom'
+        '0.1729', '0.0', '0.4066',    # New Translation: x, y, z
+        '0.0', '0.191986', '0.0',     # New Rotation: yaw, pitch, roll
+        'map', 'odom'                 # frames
         ]
     )
+
 
     obstacle_detector_node = Node(
         package='lidar_detection',
@@ -113,7 +115,7 @@ def generate_launch_description():
     )
     return LaunchDescription([
         static_tf_lidar_to_base,
-        static_tf_odom_to_map,
+        static_tf_map_to_odom,
         delayed_obstacle_detector,
         delayed_interface_node1,
         delayed_interface_node2,

@@ -15,7 +15,8 @@ setup(
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'models'), glob('models/*.pt')),
         (os.path.join('share', package_name, 'models'), glob('models/*.onnx')),
-        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz'))
+        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
+        (os.path.join('share', package_name, 'models/openvino'), glob('models/yolov11s_openvino_model/*'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,

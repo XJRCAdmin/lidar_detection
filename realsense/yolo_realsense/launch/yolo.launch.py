@@ -12,7 +12,7 @@ def generate_launch_description():
     model_path = os.path.join(
         get_package_share_directory(this_package_name),
         'models',
-        'yolov11s.pt'
+        'openvino'
     ) 
     # Run the yolov11 node, with the set device
     yolov11_node = Node(
@@ -24,7 +24,7 @@ def generate_launch_description():
             {'device': f'{torch_device}'},
             {'model': model_path},  
             {'enable_bg_removal': True},
-            {'model_type': 'pt'}
+            {'model_type': 'ov'}
         ],
     )
     
