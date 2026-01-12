@@ -29,6 +29,8 @@ private:
   std::string target_frame_;
   std::string transition_frame_;
   double static_velocity_thresh_;
+  bool AlignObstacleToFrame_;
+
   rclcpp::Subscription<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr obstacle_lidar_sub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr static_obstacle_to_baselink_pub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr dynamic_obstacle_to_baselink_pub_;
@@ -51,6 +53,7 @@ public:
     target_frame_ = this->declare_parameter<std::string>("target_frame", "base_link");
 
     static_velocity_thresh_ = this->declare_parameter<double>("static_velocity_thresh", 0.1);
+    AlignObstacleToFrame_ = this->declare_parameter<bool>("AlignObstacleToFrame", true);
 
     obstacle_lidar_sub_ = this->create_subscription<lidar_detection::msg::ObstacleDetectionArray>(
       obstacle_lidar_topic_, 10, std::bind(&ObstacleToBaselinkNode::ObstacleCallback, this, std::placeholders::_1));
@@ -86,6 +89,12 @@ public:
     lidar_detection::msg::ObstacleDetectionArray dynamic_obstacle_msgs;
     lidar_detection::msg::ObstacleDetectionArray baselink_static_obstacle_msgs;
     lidar_detection::msg::ObstacleDetectionArray baselink_dynamic_obstacle_msgs;
+
+    visualization_msgs::msg::MarkerArray static_obstacle_markers;
+    visualization_msgs::msg::MarkerArray dynamic_obstacle_text_markers;
+    visualization_msgs::msg::MarkerArray dynamic_obstacle_array_markers;
+    visualization_msgs::msg::MarkerArray dynamic_obstacle_cube_markers;
+
     static_obstacle_msgs.header = custom_obstacle_array_msg.header;
     dynamic_obstacle_msgs.header = custom_obstacle_array_msg.header;
     for (auto & detection : custom_obstacle_array_msg.detections) {
@@ -107,13 +116,20 @@ public:
     TransformObstacle(transition_frame_, target_frame_, static_obstacle_msgs, baselink_static_obstacle_msgs);
     TransformObstacle(transition_frame_, target_frame_, dynamic_obstacle_msgs, baselink_dynamic_obstacle_msgs);
 
-    visualization_msgs::msg::MarkerArray static_obstacle_markers = StaticObstacleCubeMarker(static_obstacle_msgs);
-    visualization_msgs::msg::MarkerArray dynamic_obstacle_text_markers =
-      DynamicObstacleTextMarker(dynamic_obstacle_msgs);
-    visualization_msgs::msg::MarkerArray dynamic_obstacle_array_markers =
-      DynamicObstacleArrayMarker(dynamic_obstacle_msgs);
-    visualization_msgs::msg::MarkerArray dynamic_obstacle_cube_markers =
-      DynamicObstacleCubeMarker(dynamic_obstacle_msgs);
+    if (AlignObstacleToFrame_) {
+      AlignObstacleToFrame(baselink_static_obstacle_msgs);
+      AlignObstacleToFrame(baselink_dynamic_obstacle_msgs);
+
+      static_obstacle_markers = StaticObstacleCubeMarker(baselink_static_obstacle_msgs);
+      dynamic_obstacle_text_markers = DynamicObstacleTextMarker(baselink_dynamic_obstacle_msgs);
+      dynamic_obstacle_array_markers = DynamicObstacleArrayMarker(baselink_dynamic_obstacle_msgs);
+      dynamic_obstacle_cube_markers = DynamicObstacleCubeMarker(baselink_dynamic_obstacle_msgs);
+    } else {
+      static_obstacle_markers = StaticObstacleCubeMarker(static_obstacle_msgs);
+      dynamic_obstacle_text_markers = DynamicObstacleTextMarker(dynamic_obstacle_msgs);
+      dynamic_obstacle_array_markers = DynamicObstacleArrayMarker(dynamic_obstacle_msgs);
+      dynamic_obstacle_cube_markers = DynamicObstacleCubeMarker(dynamic_obstacle_msgs);
+    }
 
     static_obstacle_to_baselink_pub_->publish(baselink_static_obstacle_msgs);
     dynamic_obstacle_to_baselink_pub_->publish(baselink_dynamic_obstacle_msgs);
@@ -124,6 +140,19 @@ public:
     dynamic_obstacle_text_markers_pub_->publish(dynamic_obstacle_text_markers);
     dynamic_obstacle_array_markers_pub_->publish(dynamic_obstacle_array_markers);
   }
+
+  /**
+ * @brief 将障碍物检测消息从源坐标系转换到目标坐标系
+ * 
+ * 该函数接收一个障碍物检测数组消息，将其中每个障碍物的位置、线速度和角速度
+ * 从源坐标系转换到目标坐标系，并将转换后的结果存储到输出消息中。
+ * 转换过程使用TF2库进行坐标变换，确保在不同坐标系间的准确转换。
+ * 
+ * @param source_frame_ 源坐标系名称
+ * @param target_frame_ 目标坐标系名称
+ * @param obstacle_msg 输入的障碍物检测数组消息（源坐标系下）
+ * @param custom_obstacle_array_msg 输出的障碍物检测数组消息（目标坐标系下）
+ */
   void TransformObstacle(
     std::string source_frame_, std::string target_frame_,
     const lidar_detection::msg::ObstacleDetectionArray & obstacle_msg,
@@ -180,6 +209,56 @@ public:
 
       custom_obstacle_msg.detection.header.frame_id = target_frame_;
       custom_obstacle_array_msg.detections.push_back(custom_obstacle_msg);
+    }
+  }
+  void AlignObstacleToFrame(lidar_detection::msg::ObstacleDetectionArray & obstacle_msg_Array)
+  {
+    for (auto & detection_msg : obstacle_msg_Array.detections) {
+      auto & bbox = detection_msg.detection.bbox;
+
+      Eigen::Vector3d center(bbox.center.position.x, bbox.center.position.y, bbox.center.position.z);
+      Eigen::Quaterniond q(
+        bbox.center.orientation.w, bbox.center.orientation.x, bbox.center.orientation.y, bbox.center.orientation.z);
+      if (q.norm() < 1e-6) {
+        q = Eigen::Quaterniond::Identity();
+      } else {
+        q.normalize();
+      }
+
+      const Eigen::Matrix3d rotation = q.toRotationMatrix();
+      const Eigen::Vector3d half_size(bbox.size.x * 0.5, bbox.size.y * 0.5, bbox.size.z * 0.5);
+
+      Eigen::Vector3d min_pt(
+        std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+      Eigen::Vector3d max_pt(
+        std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(),
+        std::numeric_limits<double>::lowest());
+
+      for (int i = 0; i < 8; ++i) {
+        Eigen::Vector3d corner(
+          (i & 1) ? half_size.x() : -half_size.x(), (i & 2) ? half_size.y() : -half_size.y(),
+          (i & 4) ? half_size.z() : -half_size.z());
+        const Eigen::Vector3d world_corner = center + rotation * corner;
+        min_pt = min_pt.cwiseMin(world_corner);
+        max_pt = max_pt.cwiseMax(world_corner);
+      }
+
+      const Eigen::Vector3d aligned_center = 0.5 * (max_pt + min_pt);
+      Eigen::Vector3d aligned_size = max_pt - min_pt;
+      aligned_size = aligned_size.cwiseMax(Eigen::Vector3d::Zero());  // 数值稳定
+
+      bbox.center.position.x = aligned_center.x();
+      bbox.center.position.y = aligned_center.y();
+      bbox.center.position.z = aligned_center.z();
+
+      bbox.center.orientation.x = 0.0;
+      bbox.center.orientation.y = 0.0;
+      bbox.center.orientation.z = 0.0;
+      bbox.center.orientation.w = 1.0;
+
+      bbox.size.x = aligned_size.x();
+      bbox.size.y = aligned_size.y();
+      bbox.size.z = aligned_size.z();
     }
   }
 };

@@ -112,11 +112,26 @@ ament_target_dependencies(interface_node ${dependencies})
 target_link_libraries(interface_node ${PCL_LIBRARIES})
 rosidl_target_interfaces(interface_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+##
+# add_executable(pointcloud_to_livox_frame_transformer_node
+#   src/pointcloud_to_livox_frame_transformer.cpp
+# )
+# target_include_directories(pointcloud_to_livox_frame_transformer_node
+#   PUBLIC
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#     $<INSTALL_INTERFACE:include>
+#     ${PCL_INCLUDE_DIRS}
+# )
+# ament_target_dependencies(pointcloud_to_livox_frame_transformer_node ${dependencies})
+# target_link_libraries(pointcloud_to_livox_frame_transformer_node ${PCL_LIBRARIES})
+# rosidl_target_interfaces(pointcloud_to_livox_frame_transformer_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 ## 
 install(TARGETS
   obstacle_detector_node
   odom_trans_node
   interface_node
+  # pointcloud_to_livox_frame_transformer_node
   obstacle_to_baselink_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )

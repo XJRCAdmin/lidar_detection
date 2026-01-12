@@ -13,8 +13,7 @@ using std::placeholders::_1;
 
 class OdomTransformerNode : public rclcpp::Node
 {
-  private:
-
+private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
 
@@ -25,9 +24,9 @@ class OdomTransformerNode : public rclcpp::Node
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-  
-  public:
-    OdomTransformerNode() : Node("odom_trans_node"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_)
+
+public:
+  OdomTransformerNode() : Node("odom_trans_node"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_)
   {
     input_odom_topic_ = this->declare_parameter<std::string>("input_odom_topic", "/Odometry");
     output_odom_topic_ = this->declare_parameter<std::string>("output_odom_topic", "/odom_base_link");
@@ -49,7 +48,7 @@ class OdomTransformerNode : public rclcpp::Node
   {
     nav_msgs::msg::Odometry transformed_odom;
     transformed_odom.header.stamp = odom_msg->header.stamp;
-    transformed_odom.header.frame_id = "lidar_body";
+    transformed_odom.header.frame_id = source_frame_;
     transformed_odom.child_frame_id = target_frame_;
 
     geometry_msgs::msg::TransformStamped transform_stamped;
@@ -99,7 +98,6 @@ class OdomTransformerNode : public rclcpp::Node
       odom_pub_->publish(transformed_odom);
     }
   }
-
 };
 
 int main(int argc, char ** argv)

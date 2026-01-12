@@ -25,7 +25,7 @@ obstacle_detector_node:
     rotate_pitch: 0.0    # 俯仰角 (弧度) - 绕Y轴旋转, 范围: [-3.14, 3.14]
     rotate_yaw: 0.0      # 偏航角 (弧度) - 绕Z轴旋转, 范围: [-3.14, 3.14]
     
-    use_pca_box: false          # 使用PCA边界框 (vs 轴对齐边界框)
+    use_pca_box: true          # 使用PCA边界框 (vs 轴对齐边界框)
     use_tracking: true         # 启用目标跟踪功能
     
     voxel_grid_size: 0.1       # 体素网格大小 (米) - 点云下采样分辨率, 范围: [0.05, 1.0],尽量小一些,在0.1~0.2之间效果好一些
@@ -74,6 +74,7 @@ odom_trans_node:
 obstacle_to_baselink_node:
   ros__parameters:
     static_velocity_thresh: 0.15  # 静止速度阈值 (米/秒), 低于该速度的障碍物被视为静止
+    AlignObstacleToFrame: true  # 是否将障碍物对齐到目标坐标系
     obstacle_lidar_topic: "/detected_objects"
     dynamic_obstacle_baselink_topic: "/dynamic_obstacle_in_baselink"
     static_obstacle_baselink_topic: "/static_obstacle_in_baselink"
@@ -93,3 +94,8 @@ interface_node:
     source_frame: "base_link"
     target_frame: "base_link"
     robot_radius: 0.5  # robot 半径 (米)
+
+pointcloud_to_livox_frame_transformer_node:
+  ros__parameters:
+    input_cloud_registered_topic: "/cloud_registered"
+    input_cloud_registered_body_topic: "/cloud_registered_body"
