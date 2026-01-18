@@ -85,6 +85,7 @@ def generate_launch_description():
         parameters=[config_file]
     )
 
+
     # pointcloud_to_livox_frame_transformer_node = Node(
     #     package='lidar_detection',
     #     executable='pointcloud_to_livox_frame_transformer_node',
@@ -92,6 +93,14 @@ def generate_launch_description():
     #     output='screen',
     #     parameters=[config_file]
     # )
+
+    static_map_filter_node = Node(
+        package='lidar_detection',
+        executable='static_map_filter_node',
+        name='static_map_filter_node',
+        output='screen',
+        parameters=[config_file]
+    )
 
 
 
@@ -120,7 +129,7 @@ def generate_launch_description():
         actions=[
             odom_trans_node,
             obstacle_to_baselink_node,
-            # pointcloud_to_livox_frame_transformer_node
+       #     static_map_filter_node
         ]
     )
     

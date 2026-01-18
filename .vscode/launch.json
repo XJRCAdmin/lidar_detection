@@ -43,7 +43,6 @@
       "type": "promptString",
       "description": "Enter the C++ node executable name",
       "default": "obstacle_detector_node"
-      // "default": "dynfilter"
     }
   ]
 }

@@ -47,6 +47,11 @@ double GROUND_DISTANCE_THRESH;
 double MIN_HEIGHT_AND_LONGEST_EDGE_RATIO;
 double BOX_MAX_LENGTH_THRESHOLD;
 
+bool ENABLE_WALL_SEGMENTATION;
+double WALL_DISTANCE_THRESH;
+double GROUND_NORMAL_ANGLE_THRESH_RAD;
+double WALL_NORMAL_ANGLE_THRESH_RAD;
+
 class ObstacleDetectorNode : public rclcpp::Node
 {
 public:
@@ -61,11 +66,15 @@ private:
   Eigen::Vector4f MIN_POINT, MAX_POINT;
   std::vector<Box> prev_boxes_, curr_boxes_;
   size_t obstacle_id_{0};
-
+  size_t next_obstacle_id_{0};
+  std::unordered_map<int, std::vector<geometry_msgs::msg::Point32>> corner_history_;
+  float size_smooth_factor_ = 0.3f;
+  float corner_smooth_alpha_ = 0.3f;
   double veh_x_{0.0}, veh_y_{0.0}, veh_z_{0.0}, veh_course_{0.0};
 
   std::string bbox_target_frame_;
   std::string bbox_source_frame_;
+  std::unordered_map<int, Eigen::Vector3f> bbox_size_history_;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_lidar_points_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_topic_;
@@ -74,6 +83,14 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_clusters_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_marker_bboxes_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr pub_objects_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_after_voxel_ROI;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_after_statistical_removal;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_after_segmentation_first_pointer;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_after_segmentation_second_pointer;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_clustered_original_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_representative_corners_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_walls_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_segmentation_wall_pointer;
 
   void lidarPointsCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr lidar_points);
 
@@ -100,6 +117,7 @@ private:
     const pcl::PointCloud<pcl::PointXYZ>::Ptr & input_cloud);
 
   bool applyHeightAndRangeFilter(const Box & box);
+  void publishCornerMarkers(const std::vector<Box> & boxes, const std_msgs::msg::Header & header);
 
   std::vector<geometry_msgs::msg::Point32> selectRepresentativeCorners(
     const std::vector<geometry_msgs::msg::Point32> & all_points, const Eigen::Vector3f & position,
@@ -148,6 +166,22 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   pub_marker_bboxes_ =
     this->create_publisher<visualization_msgs::msg::MarkerArray>(marker_bboxes_topic, rclcpp::QoS(1));
   pub_objects_ = this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>(objects_topic, rclcpp::QoS(1));
+  pub_cloud_clustered_original_ =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_clustered_original", rclcpp::QoS(1));
+  pub_cloud_after_voxel_ROI =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_after_voxel_ROI", rclcpp::QoS(1));
+  pub_cloud_after_statistical_removal =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_after_statistical_removal", rclcpp::QoS(1));
+  pub_cloud_after_segmentation_first_pointer =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_segmentation_first", rclcpp::QoS(1));
+  pub_cloud_after_segmentation_second_pointer =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_segmentation_second", rclcpp::QoS(1));
+  // 在ObstacleDetectorNode构造函数中的Publishers部分添加
+  pub_representative_corners_ =
+    this->create_publisher<visualization_msgs::msg::MarkerArray>("/representative_corners", rclcpp::QoS(1));
+  pub_cloud_walls_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_walls", rclcpp::QoS(1));
+  pub_cloud_segmentation_wall_pointer =
+    this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_segmentation_wall", rclcpp::QoS(1));
 
   // Declare dynamic parameters - 默认值与YAML文件保持一致
   this->declare_parameter<double>("rotate_x", 0.0);
@@ -184,6 +218,10 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   this->declare_parameter<double>("ground_distance_threshold", 1.8);
   this->declare_parameter<double>("min_height_and_longest_edge_ratio", 0.1);
   this->declare_parameter<double>("box_max_length_threshold", 3.0);
+  this->declare_parameter<bool>("enable_wall_segmentation", true);
+  this->declare_parameter<double>("wall_distance_threshold", 0.2);
+  this->declare_parameter<double>("ground_normal_angle_thresh_rad", 0.34906585);
+  this->declare_parameter<double>("wall_normal_angle_thresh_rad", 0.34906585);
 
   // Read initial dynamic parameters into globals
   this->get_parameter("rotate_x", ROTATE_X);
@@ -224,6 +262,14 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
   this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
+  this->get_parameter("enable_wall_segmentation", ENABLE_WALL_SEGMENTATION);
+  this->get_parameter("wall_distance_threshold", WALL_DISTANCE_THRESH);
+  this->get_parameter("ground_normal_angle_thresh_rad", GROUND_NORMAL_ANGLE_THRESH_RAD);
+  this->get_parameter("wall_normal_angle_thresh_rad", WALL_NORMAL_ANGLE_THRESH_RAD);
+
+  /**
+   * @brief 动态参数更新回调函数
+   */
   // Register parameter change callback (replacement for dynamic_reconfigure)
   param_cb_handle_ = this->add_on_set_parameters_callback(
     [this](const std::vector<rclcpp::Parameter> & params) -> rcl_interfaces::msg::SetParametersResult {
@@ -275,6 +321,11 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
       this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
       this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
+      this->get_parameter("enable_wall_segmentation", ENABLE_WALL_SEGMENTATION);
+      this->get_parameter("wall_distance_threshold", WALL_DISTANCE_THRESH);
+      this->get_parameter("ground_normal_angle_thresh_rad", GROUND_NORMAL_ANGLE_THRESH_RAD);
+      this->get_parameter("wall_normal_angle_thresh_rad", WALL_NORMAL_ANGLE_THRESH_RAD);
+
       return result;
     });
 }
@@ -315,28 +366,79 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
   RCLCPP_INFO(
     logger, "After statistical filter: %zu points (neighbors=%d, std_ratio=%.2f)", statistical_filtered_cloud->size(),
     STATISTICAL_NB_NEIGHBORS, STATISTICAL_STD_RATIO);
+  sensor_msgs::msg::PointCloud2 cloud_statistical_msg;
+  pcl::toROSMsg(*statistical_filtered_cloud, cloud_statistical_msg);
+  cloud_statistical_msg.header = pointcloud_header;
+  pub_cloud_after_statistical_removal->publish(cloud_statistical_msg);
 
   // Downsampleing, ROI
   auto filtered_cloud = obstacle_detector->filterCloud(
     statistical_filtered_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT, MIN_POINT, MAX_POINT);
   RCLCPP_INFO(logger, "After voxel+ROI filter: %zu points", filtered_cloud->size());
+  sensor_msgs::msg::PointCloud2 cloud_after_msg;
+  pcl::toROSMsg(*filtered_cloud, cloud_after_msg);
+  cloud_after_msg.header = pointcloud_header;
+  pub_cloud_after_voxel_ROI->publish(cloud_after_msg);
 
   // Prepare segmented cloud pointers
   std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds_ptr;
   segmented_clouds_ptr.first = boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();   // obstacle cloud
   segmented_clouds_ptr.second = boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();  // ground cloud
+  pcl::PointCloud<pcl::PointXYZ>::Ptr wall_cloud_ptr;
 
   if (GROUND_SEGMENT_TYPE == "RANSAC") {
-    RCLCPP_INFO(logger, "Using RANSAC for ground segmentation");
-    auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
-    segmented_clouds_ptr.first = segmented_clouds.first;
-    segmented_clouds_ptr.second = segmented_clouds.second;
-  } else {
-    RCLCPP_INFO(logger, "Using SAC for ground segmentation");
+    if (ENABLE_WALL_SEGMENTATION) {
+      RCLCPP_INFO(logger, "Using RANSAC with wall segmentation");
+      auto [obstacle, ground, wall] = obstacle_detector->segmentPlaneWithWalls(
+        filtered_cloud, 30, static_cast<float>(GROUND_THRESH), static_cast<float>(WALL_DISTANCE_THRESH),
+        static_cast<float>(GROUND_NORMAL_ANGLE_THRESH_RAD), static_cast<float>(WALL_NORMAL_ANGLE_THRESH_RAD));
+
+      segmented_clouds_ptr.first = obstacle;
+      segmented_clouds_ptr.second = ground;
+      wall_cloud_ptr = wall;
+
+      // 发布墙体点云,调试使用
+      sensor_msgs::msg::PointCloud2 cloud_segmented_wall_msg;
+      pcl::toROSMsg(*wall_cloud_ptr, cloud_segmented_wall_msg);
+      cloud_segmented_wall_msg.header = pointcloud_header;
+      pub_cloud_segmentation_wall_pointer->publish(cloud_segmented_wall_msg);
+
+    } else {
+      RCLCPP_INFO(logger, "Using RANSAC for ground segmentation only");
+      auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
+      segmented_clouds_ptr.first = segmented_clouds.first;
+      segmented_clouds_ptr.second = segmented_clouds.second;
+    }
   }
+
+  // 发布分割后的第一个点云（障碍物云）,调试使用 等于 /cloud_clusters
+  sensor_msgs::msg::PointCloud2 cloud_segmented_first_msg;
+  pcl::toROSMsg(*segmented_clouds_ptr.first, cloud_segmented_first_msg);
+  cloud_segmented_first_msg.header = pointcloud_header;
+  pub_cloud_after_segmentation_first_pointer->publish(cloud_segmented_first_msg);
+  // 发布分割后的第二个点云（地面云）,调试使用 等于 /cloud_ground
+  sensor_msgs::msg::PointCloud2 cloud_segmented_second_msg;
+  pcl::toROSMsg(*segmented_clouds_ptr.second, cloud_segmented_second_msg);
+  cloud_segmented_second_msg.header = pointcloud_header;
+  pub_cloud_after_segmentation_second_pointer->publish(cloud_segmented_second_msg);
 
   auto cloud_clusters =
     obstacle_detector->clustering(segmented_clouds_ptr.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr merged_clusters_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  for (const auto & cluster : cloud_clusters) {
+    *merged_clusters_cloud += *cluster;
+  }
+
+  // 发布合并后的聚类点云
+  sensor_msgs::msg::PointCloud2 clusters_msg;
+  pcl::toROSMsg(*merged_clusters_cloud, clusters_msg);
+  clusters_msg.header = pointcloud_header;
+  pub_cloud_clustered_original_->publish(clusters_msg);
+  RCLCPP_INFO(
+    this->get_logger(), "Published clusters cloud: %zu points, %zu clusters", merged_clusters_cloud->size(),
+    cloud_clusters.size());
+
   ClusteringDebug(cloud_clusters, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE, this->get_logger());
 
   auto convex_clusters = obstacle_detector->computeConvexHulls(cloud_clusters);
@@ -425,12 +527,17 @@ void ObstacleDetectorNode::publishDetectedObjects(
 {
   RCLCPP_INFO(this->get_logger(), "Building bounding boxes for %zu clusters", cloud_clusters.size());
 
+  std::vector<Box> temp_boxes;
+  std::vector<size_t> cluster_indices;
+
   for (size_t i = 0; i < cloud_clusters.size(); ++i) {
     auto & cluster = cloud_clusters[i];
     auto & convex_cluster = convex_clusters[i];
 
-    Box box = USE_PCA_BOX ? obstacle_detector->pcaBoundingBox(cluster, obstacle_id_)
+    int temp_id = -static_cast<int>(i + 1);
+    Box box = USE_PCA_BOX ? obstacle_detector->pcaBoundingBoxSmoothed(cluster, obstacle_id_)
                           : obstacle_detector->axisAlignedBoundingBox(cluster, obstacle_id_);
+    obstacle_detector->cleanupBoxHistory();
     // RCLCPP_INFO(
     //   this->get_logger(),
     //   "Created Box ID %zu: position=(%.2f,%.2f,%.2f), dimension=(%.2f,%.2f,%.2f), cluster_points=%zu", obstacle_id_,
@@ -453,22 +560,24 @@ void ObstacleDetectorNode::publishDetectedObjects(
     if (!representative_corners.empty()) {
       representative_corners.push_back(representative_corners.front());
     }
-    box = Box(obstacle_id_, box.position, box.dimension, box.quaternion, representative_corners);
+    box = Box(temp_id, box.position, box.dimension, box.quaternion, representative_corners);
 
     if (applyHeightAndRangeFilter(box)) {
       continue;
     }
-
-    if (obstacle_id_ < std::numeric_limits<size_t>::max()) {
-      obstacle_id_ += 1;
-    } else {
-      obstacle_id_ = 0;
-    }
-    curr_boxes_.emplace_back(box);
+    temp_boxes.emplace_back(box);
+    cluster_indices.push_back(i);
+    // curr_boxes_.emplace_back(box);
   }
 
   if (USE_TRACKING) {
-    obstacle_detector->obstacleTracking(prev_boxes_, curr_boxes_, DISPLACEMENT_THRESH, IOU_THRESH);
+    obstacle_detector->obstacleTracking(prev_boxes_, temp_boxes, DISPLACEMENT_THRESH, IOU_THRESH);
+  }
+  for (auto & box : temp_boxes) {
+    if (box.id < 0) {
+      box.id = static_cast<int>(next_obstacle_id_++);
+      if (next_obstacle_id_ > 100000) next_obstacle_id_ = 0;  // 防止溢出
+    }
   }
 
   auto bbox_header = header;
@@ -478,24 +587,38 @@ void ObstacleDetectorNode::publishDetectedObjects(
   lidar_detection::msg::ObstacleDetectionArray detected_objects;
   detected_objects.header = bbox_header;
 
-  for (size_t i = 0; i < curr_boxes_.size(); ++i) {
+  curr_boxes_.clear();
+
+  for (size_t i = 0; i < temp_boxes.size(); ++i) {
     if (i >= cloud_clusters.size()) {
       RCLCPP_WARN(
         this->get_logger(), "Box index %zu exceeds cloud_clusters size %zu, skipping", i, cloud_clusters.size());
       continue;
     }
 
-    auto & box = curr_boxes_[i];
-    auto detection = boxToDetection3D(box, cloud_clusters[i], bbox_header);
+    auto & box = temp_boxes[i];
+    size_t orig_idx = cluster_indices[i];
+
+    float size_smooth_factor_ = 0.3f;  // smaller value means more smoothing
+    auto it = bbox_size_history_.find(box.id);
+    if (it != bbox_size_history_.end()) {
+      const Eigen::Vector3f prev = it->second;
+      box.dimension = size_smooth_factor_ * box.dimension + (1.0f - size_smooth_factor_) * prev;
+      box.dimension = box.dimension.cwiseMax(Eigen::Vector3f::Constant(1e-3f));  // avoid zero dimension
+    }
+    bbox_size_history_[box.id] = box.dimension;
+    curr_boxes_.emplace_back(box);
+
+    auto detection = boxToDetection3D(box, cloud_clusters[orig_idx], bbox_header);
     auto marker_array = transformMarker(box, bbox_header, detection.detection.bbox.center);
     bboxes_marker_array.markers.insert(
       bboxes_marker_array.markers.end(), marker_array.markers.begin(), marker_array.markers.end());
-
     detected_objects.detections.emplace_back(detection);
   }
 
   pub_marker_bboxes_->publish(bboxes_marker_array);
   pub_objects_->publish(detected_objects);
+  publishCornerMarkers(curr_boxes_, bbox_header);
 
   RCLCPP_INFO(this->get_logger(), "Boxes built: %zu, target frame=%s", curr_boxes_.size(), bbox_target_frame_.c_str());
 
@@ -733,6 +856,59 @@ std::vector<geometry_msgs::msg::Point32> ObstacleDetectorNode::calculateBoxVerti
   }
 
   return global_corners;
+}
+
+void ObstacleDetectorNode::publishCornerMarkers(const std::vector<Box> & boxes, const std_msgs::msg::Header & header)
+{
+  visualization_msgs::msg::MarkerArray corners_vis;
+  int mid = 0;
+  for (const auto & box : boxes) {
+    // 1) 代表性角点 POINTS（来自 Box::convex_hull）
+    visualization_msgs::msg::Marker pts;
+    pts.header = header;
+    pts.ns = "rep_corners";
+    pts.id = mid++;
+    pts.type = visualization_msgs::msg::Marker::POINTS;
+    pts.action = visualization_msgs::msg::Marker::ADD;
+    pts.pose.orientation.w = 1.0;
+    pts.scale.x = 0.05;
+    pts.scale.y = 0.05;
+    pts.color.g = 1.0;
+    pts.color.a = 1.0;
+    for (const auto & p : box.convex_hull) {
+      geometry_msgs::msg::Point gp;
+      gp.x = p.x;
+      gp.y = p.y;
+      gp.z = p.z;
+      pts.points.push_back(gp);
+    }
+    corners_vis.markers.push_back(pts);
+
+    // 2) 8 个顶点连线 LINE_STRIP（来自 calculateBoxVertices ）
+    auto full_corners = calculateBoxVertices(box.position, box.dimension, box.quaternion);
+    visualization_msgs::msg::Marker lines;
+    lines.header = header;
+    lines.ns = "full_vertices";
+    lines.id = mid++;
+    lines.type = visualization_msgs::msg::Marker::LINE_STRIP;
+    lines.action = visualization_msgs::msg::Marker::ADD;
+    lines.pose.orientation.w = 1.0;
+    lines.scale.x = 0.03;
+    lines.color.b = 1.0;
+    lines.color.a = 1.0;
+    for (const auto & p : full_corners) {
+      geometry_msgs::msg::Point gp;
+      gp.x = p.x;
+      gp.y = p.y;
+      gp.z = p.z;
+      lines.points.push_back(gp);
+    }
+    if (!lines.points.empty()) {
+      lines.points.push_back(lines.points.front());  // 闭合
+    }
+    corners_vis.markers.push_back(lines);
+  }
+  pub_representative_corners_->publish(corners_vis);
 }
 
 }  // namespace lidar_detection

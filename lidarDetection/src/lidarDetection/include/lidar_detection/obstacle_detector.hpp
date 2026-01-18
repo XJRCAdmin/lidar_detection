@@ -59,6 +59,12 @@ public:
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> segmentPlane(
     const typename pcl::PointCloud<PointT>::ConstPtr & cloud, const int max_iterations, const float distance_thresh);
 
+  std::tuple<
+    typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr>
+  segmentPlaneWithWalls(
+    const typename pcl::PointCloud<PointT>::ConstPtr & cloud, int max_iterations, float ground_distance_thresh,
+    float wall_distance_thresh, float ground_normal_angle_thresh_rad, float wall_normal_angle_thresh_rad);
+
   std::vector<typename pcl::PointCloud<PointT>::Ptr> clustering(
     const typename pcl::PointCloud<PointT>::ConstPtr & cloud, const float cluster_tolerance, const int min_size,
     const int max_size);
@@ -69,6 +75,9 @@ public:
   Box axisAlignedBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr & cluster, const int id);
 
   Box pcaBoundingBox(typename pcl::PointCloud<PointT>::Ptr & cluster, const int id);
+
+  Box pcaBoundingBoxSmoothed(typename pcl::PointCloud<PointT>::Ptr & cluster, const int id);
+  void cleanupBoxHistory();
 
   // ****************** Tracking ***********************
   void obstacleTracking(
@@ -83,7 +92,27 @@ private:
   // ****************** Tracking ***********************
   std::unordered_map<int, UKF> ukf_states;
   std::unordered_map<int, int> match_counts;
+  std::unordered_map<int, Eigen::Vector2f> velocity_history_;
+  const float static_speed_gate_ = 0.15f;
+  const float velocity_alpha_ = 0.35f;
+
   bool compareBoxes(const Box & a, const Box & b, const float displacement_thresh, const float iou_thresh);
+  // ****************** BBox smoothing ***********************
+  struct BoxHistory
+  {
+    Eigen::Vector3f position;
+    Eigen::Vector3f dimension;
+    Eigen::Quaternionf quaternion;
+    int frame_count;
+    std::chrono::steady_clock::time_point last_update;
+  };
+  std::vector<BoxHistory> box_history_pool_;
+
+  const float position_match_thresh_ = 0.5f;     // 位置匹配阈值（米）
+  const float dimension_smooth_alpha_ = 0.3f;    // 尺寸平滑系数
+  const float orientation_smooth_alpha_ = 0.4f;  // 朝向平滑系数
+  const float position_smooth_alpha_ = 0.5f;     // 位置平滑系数
+  const int max_history_age_ms_ = 500;           // 历史记录最大存活时间（毫秒）
 
   // Link nearby bounding boxes between the previous and previous frame
   std::vector<std::vector<int>> associateBoxes(
@@ -107,6 +136,10 @@ private:
 
   // Helper function for checking if a point is inside a bounding box
   bool isPointInBoundingBox(const Eigen::Vector3f & point, const Box & box);
+
+  int findMatchingHistory(const Eigen::Vector3f & position, const Eigen::Vector3f & dimension);
+
+  Eigen::Quaternionf alignQuaternion(const Eigen::Quaternionf & prev, const Eigen::Quaternionf & curr);
 };
 
 // constructor:
@@ -165,6 +198,113 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(
   extract.filter(*cloud_roi);
 
   return cloud_roi;
+}
+
+template <typename PointT>
+std::tuple<
+  typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr>
+ObstacleDetector<PointT>::segmentPlaneWithWalls(
+  const typename pcl::PointCloud<PointT>::ConstPtr & cloud, int max_iterations, float ground_distance_thresh,
+  float wall_distance_thresh, float ground_normal_angle_thresh_rad, float wall_normal_angle_thresh_rad)
+{
+  // segment plane 有可能会分割出墙面,也有可能是地面
+  // 因为场景中墙面不一定存在,但是一定有地面,因而需要判断分割出的平面究竟是墙面还是地面
+  // 对于分割出的地面平面,判断其法向量与Z轴的夹角是否小于ground_normal_angle_thresh_rad,如果小于,则是.说明分割的是地面,则退出处理.返回
+  // 否则,说明分割出来的是墙面,则需要进一步分割地面
+  // 再次运行segmentPlane在剩余点云中分割地面
+  auto logger = rclcpp::get_logger("obstacle_detector");
+
+  typename pcl::PointCloud<PointT>::Ptr obstacle_cloud(new pcl::PointCloud<PointT>());
+  typename pcl::PointCloud<PointT>::Ptr ground_cloud(new pcl::PointCloud<PointT>());
+  typename pcl::PointCloud<PointT>::Ptr wall_cloud(new pcl::PointCloud<PointT>());
+
+  typename pcl::PointCloud<PointT>::Ptr current_remaining(new pcl::PointCloud<PointT>(*cloud));
+  /** 分割地面 ***/
+  // Find inliers for the cloud.
+  pcl::SACSegmentation<PointT> seg;
+  pcl::PointIndices::Ptr inliers{new pcl::PointIndices};
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+  seg.setOptimizeCoefficients(true);
+  seg.setModelType(pcl::SACMODEL_PERPENDICULAR_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setMaxIterations(max_iterations);
+  seg.setDistanceThreshold(ground_distance_thresh);
+  seg.setAxis(Eigen::Vector3f::UnitZ());
+  seg.setEpsAngle(ground_normal_angle_thresh_rad);
+  // Segment the largest planar component from the input cloud
+  seg.setInputCloud(current_remaining);
+  seg.segment(*inliers, *coefficients);
+  if (inliers->indices.empty()) {
+    RCLCPP_WARN(logger, "Could not estimate a planar model for the given dataset.");
+  }
+  pcl::ExtractIndices<PointT> extract;
+  extract.setInputCloud(current_remaining);
+  extract.setIndices(inliers);
+  extract.setNegative(false);
+  extract.filter(*ground_cloud);
+  typename pcl::PointCloud<PointT>::Ptr next_remaining(new pcl::PointCloud<PointT>());
+  extract.setNegative(true);
+  extract.filter(*next_remaining);
+  current_remaining = next_remaining;
+  RCLCPP_INFO(
+    logger, "After ground segmentation: obstacle points=%zu, ground points=%zu", current_remaining->size(),
+    ground_cloud->size());
+  if (current_remaining->size() > 300) {
+    pcl::SACSegmentation<PointT> seg;
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+    seg.setOptimizeCoefficients(true);
+    seg.setModelType(pcl::SACMODEL_PARALLEL_PLANE);
+    seg.setAxis(Eigen::Vector3f::UnitZ());
+    seg.setEpsAngle(wall_normal_angle_thresh_rad);
+    seg.setMethodType(pcl::SAC_RANSAC);
+    seg.setMaxIterations(max_iterations);
+    seg.setDistanceThreshold(wall_distance_thresh);
+
+    seg.setInputCloud(current_remaining);
+    seg.segment(*inliers, *coefficients);
+    RCLCPP_INFO(logger, "Wall segmentation found %zu inliers", inliers->indices.size());
+    if (inliers->indices.size() > 200) {
+      pcl::ExtractIndices<PointT> extract;
+      extract.setInputCloud(current_remaining);
+      extract.setIndices(inliers);
+      extract.setNegative(false);
+      extract.filter(*wall_cloud);
+      extract.setNegative(true);
+      extract.filter(*obstacle_cloud);
+    } else {
+      obstacle_cloud = current_remaining;
+    }
+  } else {
+    obstacle_cloud = current_remaining;
+  }
+  // Eigen::Vector4f centroid;
+  // Eigen::Matrix3f covariance;
+  // pcl::computeMeanAndCovarianceMatrix(*candidate_plane, covariance, centroid);
+  // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+  // Eigen::Vector3f normal = eigen_solver.eigenvectors().col(0);
+  // float angle_diff = std::acos(std::abs(normal.dot(Eigen::Vector3f::UnitZ())));
+  // RCLCPP_INFO(logger, "Angle between candidate plane normal and Z axis: %f", angle_diff);
+  // RCLCPP_INFO(
+  //   logger, "Candidate plane size: %d, ground_normal_angle_thresh_rad: %f", candidate_plane->size(),
+  //   ground_normal_angle_thresh_rad);
+
+  // if (angle_diff < ground_normal_angle_thresh_rad) {
+  //   ground_cloud = candidate_plane;
+  //   obstacle_cloud = remaining_cloud;
+  // } else if (angle_diff >= wall_normal_angle_thresh_rad && candidate_plane->size() > 150) {
+  //   RCLCPP_INFO(
+  //     // 说明分割出来的是墙面,需要进一步分割地面
+  //     logger, "Wall normal angle threshold: %f, wall distance threshold: %f", wall_normal_angle_thresh_rad,
+  //     wall_distance_thresh);
+  //   wall_cloud = candidate_plane;
+  //   auto second_segmentation = segmentPlane(remaining_cloud, max_iterations, ground_distance_thresh);
+  //   obstacle_cloud = second_segmentation.first;
+  //   ground_cloud = second_segmentation.second;
+  // }
+
+  return {obstacle_cloud, ground_cloud, wall_cloud};
 }
 
 template <typename PointT>
@@ -434,6 +574,17 @@ void ObstacleDetector<PointT>::obstacleTracking(
         double psi = ukf.x_(3);
         double vx = v_abs * std::cos(psi);
         double vy = v_abs * std::sin(psi);
+
+        // Eigen::Vector2f measured_velocity(vx, vy);
+        // if (measured_velocity.norm() < static_speed_gate_) {
+        //   measured_velocity.setZero();
+        //   ukf.x_(2) = 0.0;
+        //   ukf.x_(4) = 0.0;
+        // }
+        // auto history = velocity_history_[uid];
+        // Eigen::Vector2f smoothed = velocity_alpha_ * measured_velocity + (1.0f - velocity_alpha_) * history;
+        // velocity_history_[uid] = smoothed;
+
         curr_boxes[cur_index].velocity[0] = vx;
         curr_boxes[cur_index].velocity[1] = vy;
 
@@ -519,9 +670,9 @@ bool ObstacleDetector<PointT>::compareBoxes(
   const float max_dim = std::max(a_max_dim, b_max_dim);
   const float ctr_dis = dis / max_dim;
 
-  const float x_dim = std::abs(2 * (a.dimension[0] - b.dimension[0]) / (a.dimension[0] + b.dimension[0]));
-  const float y_dim = std::abs(2 * (a.dimension[1] - b.dimension[1]) / (a.dimension[1] + b.dimension[1]));
-  const float z_dim = std::abs(2 * (a.dimension[2] - b.dimension[2]) / (a.dimension[2] + b.dimension[2]));
+  const float x_dim = std::abs(a.dimension[0] - b.dimension[0]) / std::max(a.dimension[0], b.dimension[0]);
+  const float y_dim = std::abs(a.dimension[1] - b.dimension[1]) / std::max(a.dimension[1], b.dimension[1]);
+  const float z_dim = std::abs(a.dimension[2] - b.dimension[2]) / std::max(a.dimension[2], b.dimension[2]);
 
   // RCLCPP_INFO(
   //   logger,
@@ -647,6 +798,118 @@ bool ObstacleDetector<PointT>::isPointInBoundingBox(const Eigen::Vector3f & poin
   return (
     std::abs(local_point.x()) <= box.dimension.x() / 2 && std::abs(local_point.y()) <= box.dimension.y() / 2 &&
     std::abs(local_point.z()) <= box.dimension.z() / 2);
+}
+
+template <typename PointT>
+Eigen::Quaternionf ObstacleDetector<PointT>::alignQuaternion(
+  const Eigen::Quaternionf & prev, const Eigen::Quaternionf & curr)
+{
+  // 如果点积为负，翻转当前四元数以确保最短路径插值
+  if (prev.dot(curr) < 0.0f) {
+    return Eigen::Quaternionf(-curr.w(), -curr.x(), -curr.y(), -curr.z());
+  }
+  return curr;
+}
+
+template <typename PointT>
+int ObstacleDetector<PointT>::findMatchingHistory(const Eigen::Vector3f & position, const Eigen::Vector3f & dimension)
+{
+  int best_idx = -1;
+  float best_score = std::numeric_limits<float>::max();
+
+  auto now = std::chrono::steady_clock::now();
+
+  for (size_t i = 0; i < box_history_pool_.size(); ++i) {
+    auto & hist = box_history_pool_[i];
+
+    auto age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - hist.last_update).count();
+    if (age_ms > max_history_age_ms_) {
+      continue;
+    }
+
+    // 计算位置距离
+    float pos_dist = (position - hist.position).norm();
+
+    // 计算尺寸相似度（用最大尺寸归一化）
+    float max_dim = std::max(
+      {dimension.x(), dimension.y(), dimension.z(), hist.dimension.x(), hist.dimension.y(), hist.dimension.z()});
+    float dim_diff = (dimension - hist.dimension).norm() / max_dim;
+
+    // 综合评分：位置权重更高
+    float score = pos_dist + 0.3f * dim_diff;
+
+    if (pos_dist < position_match_thresh_ && score < best_score) {
+      best_score = score;
+      best_idx = static_cast<int>(i);
+    }
+  }
+
+  return best_idx;
+}
+
+template <typename PointT>
+Box ObstacleDetector<PointT>::pcaBoundingBoxSmoothed(typename pcl::PointCloud<PointT>::Ptr & cluster, const int id)
+{
+  // 先用原始 PCA 计算当前帧的 box
+  Box raw_box = pcaBoundingBox(cluster, id);
+
+  // 查找匹配的历史记录
+  int hist_idx = findMatchingHistory(raw_box.position, raw_box.dimension);
+
+  auto now = std::chrono::steady_clock::now();
+
+  if (hist_idx >= 0) {
+    // 找到匹配，进行平滑
+    auto & hist = box_history_pool_[hist_idx];
+
+    // 平滑位置
+    Eigen::Vector3f smoothed_position =
+      position_smooth_alpha_ * raw_box.position + (1.0f - position_smooth_alpha_) * hist.position;
+
+    // 平滑尺寸
+    Eigen::Vector3f smoothed_dimension =
+      dimension_smooth_alpha_ * raw_box.dimension + (1.0f - dimension_smooth_alpha_) * hist.dimension;
+
+    // 平滑朝向（使用 slerp）
+    Eigen::Quaternionf aligned_quat = alignQuaternion(hist.quaternion, raw_box.quaternion);
+    Eigen::Quaternionf smoothed_quaternion = hist.quaternion.slerp(orientation_smooth_alpha_, aligned_quat);
+    smoothed_quaternion.normalize();
+
+    // 更新历史记录
+    hist.position = smoothed_position;
+    hist.dimension = smoothed_dimension;
+    hist.quaternion = smoothed_quaternion;
+    hist.frame_count++;
+    hist.last_update = now;
+
+    return Box(id, smoothed_position, smoothed_dimension, smoothed_quaternion, raw_box.convex_hull);
+  } else {
+    // 没有匹配，创建新的历史记录
+    BoxHistory new_hist;
+    new_hist.position = raw_box.position;
+    new_hist.dimension = raw_box.dimension;
+    new_hist.quaternion = raw_box.quaternion;
+    new_hist.frame_count = 1;
+    new_hist.last_update = now;
+    box_history_pool_.push_back(new_hist);
+
+    return raw_box;
+  }
+}
+
+template <typename PointT>
+void ObstacleDetector<PointT>::cleanupBoxHistory()
+{
+  auto now = std::chrono::steady_clock::now();
+
+  box_history_pool_.erase(
+    std::remove_if(
+      box_history_pool_.begin(), box_history_pool_.end(),
+      [this, now](const BoxHistory & hist) {
+        auto age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - hist.last_update).count();
+        return age_ms > max_history_age_ms_;
+      }),
+    box_history_pool_.end());
 }
 
 }  // namespace lidar_detection

@@ -6,9 +6,9 @@ if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
 endif()
 
-# Default to C++14
+# Default to C++ 17
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -113,25 +113,25 @@ target_link_libraries(interface_node ${PCL_LIBRARIES})
 rosidl_target_interfaces(interface_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 ##
-# add_executable(pointcloud_to_livox_frame_transformer_node
-#   src/pointcloud_to_livox_frame_transformer.cpp
+# add_executable( static_map_filter_node
+#   src/static_map_filter_node.cpp
 # )
-# target_include_directories(pointcloud_to_livox_frame_transformer_node
+# target_include_directories(static_map_filter_node
 #   PUBLIC
 #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 #     $<INSTALL_INTERFACE:include>
 #     ${PCL_INCLUDE_DIRS}
 # )
-# ament_target_dependencies(pointcloud_to_livox_frame_transformer_node ${dependencies})
-# target_link_libraries(pointcloud_to_livox_frame_transformer_node ${PCL_LIBRARIES})
-# rosidl_target_interfaces(pointcloud_to_livox_frame_transformer_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# ament_target_dependencies(static_map_filter_node ${dependencies})
+# target_link_libraries(static_map_filter_node ${PCL_LIBRARIES})
+# rosidl_target_interfaces(static_map_filter_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 ## 
 install(TARGETS
   obstacle_detector_node
   odom_trans_node
   interface_node
-  # pointcloud_to_livox_frame_transformer_node
+#  static_map_filter_node
   obstacle_to_baselink_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )

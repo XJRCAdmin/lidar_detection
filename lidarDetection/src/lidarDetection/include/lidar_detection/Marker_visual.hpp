@@ -17,13 +17,13 @@ visualization_msgs::msg::Marker makeFootprintOrCubeMarker(
   visualization_msgs::msg::Marker m;
   m.header = header;
   m.ns = "obstacle_bboxes";
-  m.id = box.id;  // 与障碍物 id 对齐
+  m.id = box.id;
   m.action = visualization_msgs::msg::Marker::ADD;
   m.frame_locked = false;
 
-  // 设置 lifetime 为 0.1s
+  // 设置 lifetime 为 0.15s
   m.lifetime.sec = 0;
-  m.lifetime.nanosec = 20000000;
+  m.lifetime.nanosec = 150000000;  // 0.15s
 
   m.type = visualization_msgs::msg::Marker::CUBE;
   m.pose = pose;
@@ -49,9 +49,9 @@ visualization_msgs::msg::Marker makeVelocityArrowMarker(
   m.action = visualization_msgs::msg::Marker::ADD;
   m.frame_locked = false;
 
-  // 设置 lifetime 为 0.1s
+  // 设置 lifetime 为 0.15s
   m.lifetime.sec = 0;
-  m.lifetime.nanosec = 90000000;  // 0.1s
+  m.lifetime.nanosec = 150000000;  // 0.15s
 
   geometry_msgs::msg::Point p0;
   p0.x = pose.position.x;
@@ -94,7 +94,7 @@ visualization_msgs::msg::Marker makeTextMarker(
   m.frame_locked = false;
 
   m.lifetime.sec = 0;
-  m.lifetime.nanosec = 90000000;
+  m.lifetime.nanosec = 150000000;  // 0.15s
 
   // 文本位置稍微抬高到盒子顶面上方
   m.pose = pose;
@@ -126,12 +126,16 @@ visualization_msgs::msg::MarkerArray DynamicObstacleCubeMarker(
     visualization_msgs::msg::Marker marker;
     marker.header = obstacle.detection.header;
     marker.ns = "dynamic_obstacle_bboxes";
-    marker.id = std::stoi(obstacle.id);
+    try {
+      marker.id = std::stoi(obstacle.id);
+    } catch (const std::exception &) {
+      marker.id = static_cast<int>(i);  // 使用索引作为备用ID
+    }
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.frame_locked = false;
 
     marker.lifetime.sec = 0;
-    marker.lifetime.nanosec = 90000000;
+    marker.lifetime.nanosec = 150000000;  // 0.15s
 
     marker.type = visualization_msgs::msg::Marker::CUBE;
 
@@ -161,12 +165,16 @@ visualization_msgs::msg::MarkerArray DynamicObstacleArrayMarker(
     visualization_msgs::msg::Marker cube_marker;
     cube_marker.header = obstacle.detection.header;
     cube_marker.ns = "dynamic_obstacle_bboxes";
-    cube_marker.id = std::stoi(obstacle.id);
+    try {
+      cube_marker.id = std::stoi(obstacle.id);
+    } catch (const std::exception &) {
+      cube_marker.id = static_cast<int>(i);  // 使用索引作为备用ID
+    }
     cube_marker.action = visualization_msgs::msg::Marker::ADD;
     cube_marker.frame_locked = false;
 
     cube_marker.lifetime.sec = 0;
-    cube_marker.lifetime.nanosec = 90000000;
+    cube_marker.lifetime.nanosec = 150000000;  // 0.15s
 
     cube_marker.type = visualization_msgs::msg::Marker::CUBE;
 
@@ -190,7 +198,7 @@ visualization_msgs::msg::MarkerArray DynamicObstacleArrayMarker(
     arrow_marker.frame_locked = false;
 
     arrow_marker.lifetime.sec = 0;
-    arrow_marker.lifetime.nanosec = 90000000;
+    arrow_marker.lifetime.nanosec = 100000000;  // 0.1s
 
     arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
 
@@ -237,12 +245,16 @@ visualization_msgs::msg::MarkerArray DynamicObstacleTextMarker(
     visualization_msgs::msg::Marker marker;
     marker.header = obstacle.detection.header;
     marker.ns = "dynamic_obstacle_text";
-    marker.id = std::stoi(obstacle.id);
+    try {
+      marker.id = std::stoi(obstacle.id);
+    } catch (const std::exception &) {
+      marker.id = static_cast<int>(i);  // 使用索引作为备用ID
+    }
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.frame_locked = false;
 
     marker.lifetime.sec = 0;
-    marker.lifetime.nanosec = 90000000;
+    marker.lifetime.nanosec = 150000000;  // 0.15s
 
     marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 
@@ -279,12 +291,16 @@ visualization_msgs::msg::MarkerArray StaticObstacleCubeMarker(
     visualization_msgs::msg::Marker marker;
     marker.header = obstacle.detection.header;
     marker.ns = "static_obstacle_bboxes";
-    marker.id = std::stoi(obstacle.id);
+    try {
+      marker.id = std::stoi(obstacle.id);
+    } catch (const std::exception &) {
+      marker.id = static_cast<int>(i);  // 使用索引作为备用ID
+    }
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.frame_locked = false;
 
     marker.lifetime.sec = 0;
-    marker.lifetime.nanosec = 90000000;
+    marker.lifetime.nanosec = 150000000;  // 0.15s
 
     marker.type = visualization_msgs::msg::Marker::CUBE;
     marker.pose = obstacle.detection.bbox.center;
@@ -299,4 +315,16 @@ visualization_msgs::msg::MarkerArray StaticObstacleCubeMarker(
   }
 
   return marker_array;
+}
+
+inline void ScaleMarkerAlpha(visualization_msgs::msg::MarkerArray & arr, float alpha_scale)
+{
+  if (alpha_scale < 0.0f)
+    alpha_scale = 0.0f;
+  else if (alpha_scale > 1.0f)
+    alpha_scale = 1.0f;
+
+  for (auto & m : arr.markers) {
+    m.color.a *= alpha_scale;
+  }
 }
