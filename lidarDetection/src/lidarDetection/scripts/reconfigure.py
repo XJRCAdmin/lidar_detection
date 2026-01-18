@@ -42,8 +42,15 @@ class ParameterReconfigureGUI(QWidget):
             'ground_threshold': (0.0, 1.0), 'voxel_grid_size': (0.05, 1.0),
             'displacement_threshold': (0.1, 5.0), 'iou_threshold': (0.1, 1.0),
             'statistical_nb_neighbors': (10, 100), 'statistical_std_ratio': (0.1, 4.0),
-            'max_dimension_ratio': (5.0, 10.0), 'height_limit': (0.5, 3.0),
-            'range_length': (0.5, 10.0), 'range_width': (0.5, 10.0)
+            'max_dimension_ratio': (5.0, 10.0),
+            'min_x': (-1.0, 1.0), 'min_y': (-1.0, 1.0), 'min_z': (-1.0, 1.0),
+            'max_x': (-1.0, 1.0), 'max_y': (-1.0, 1.0), 'max_z': (-1.0, 1.0),
+            'ground_distance_threshold': (0.0, 5.0),
+            'min_height_and_longest_edge_ratio': (0.0, 1.0),
+            'box_max_length_threshold': (0.0, 10.0),
+            'wall_distance_threshold': (0.0, 1.0),
+            'ground_normal_angle_thresh_rad': (0.0, 1.0),
+            'wall_normal_angle_thresh_rad': (0.0, 1.0)
         }
         self.param_descriptions = {
             'cluster_threshold': '点间最大距离(米),越大越粗糙,越小越精细',
@@ -74,10 +81,22 @@ class ParameterReconfigureGUI(QWidget):
             'rotate_pitch': '俯仰角(弧度),调整LiDAR俯仰',
             'rotate_yaw': '偏航角(弧度),调整LiDAR航向',
             
-            'max_dimension_ratio': '最大维度比例,越大允许长宽比越大的障碍物',
-            'height_limit': '高度限制(米),超过此高度的障碍物将被过滤',
-            'range_length': '检测范围长度(米),越大检测范围越长',
-            'range_width': '检测范围宽度(米),越大检测范围越宽'
+            'max_dimension_ratio': '边界框最大长宽高比例,越大允许长宽比越大的障碍物',
+            
+            'min_x': '自身点云过滤最小X值',
+            'min_y': '自身点云过滤最小Y值',
+            'min_z': '自身点云过滤最小Z值',
+            'max_x': '自身点云过滤最大X值',
+            'max_y': '自身点云过滤最大Y值',
+            'max_z': '自身点云过滤最大Z值',
+            
+            'ground_distance_threshold': '过滤高于该高度的障碍物bbox',
+            'min_height_and_longest_edge_ratio': 'bbox最小高度与最长边的比例',
+            'box_max_length_threshold': 'bbox最大长度阈值(米)',
+            
+            'wall_distance_threshold': '点到墙壁平面的距离阈值',
+            'ground_normal_angle_thresh_rad': '地面法向量与Z轴最大夹角(弧度)',
+            'wall_normal_angle_thresh_rad': '墙面法向量与XY平面最大夹角(弧度)'
         }
         rclpy.init()
         self.node = Node('parameter_reconfigure_gui')
@@ -119,6 +138,10 @@ class ParameterReconfigureGUI(QWidget):
             'rotate_x', 'rotate_y', 'rotate_z', 'rotate_roll', 'rotate_pitch', 'rotate_yaw'
         ], params))
 
+        layout.addWidget(self.create_group_box("Self Point Cloud Filter", [
+            'min_x', 'min_y', 'min_z', 'max_x', 'max_y', 'max_z'
+        ], params))
+
         layout.addWidget(self.create_group_box("ROI Filter", [
             'roi_max_x', 'roi_max_y', 'roi_max_z', 'roi_min_x', 'roi_min_y', 'roi_min_z'
         ], params))
@@ -128,7 +151,7 @@ class ParameterReconfigureGUI(QWidget):
         ], params))
 
         layout.addWidget(self.create_group_box("Ground Segmentation", [
-            'ground_threshold'
+            'ground_threshold', 'ground_segment'
         ], params))
 
         layout.addWidget(self.create_group_box("Downsampling", [
@@ -143,8 +166,18 @@ class ParameterReconfigureGUI(QWidget):
             'enable_statistical_filter', 'statistical_nb_neighbors', 'statistical_std_ratio'
         ], params))
 
+        layout.addWidget(self.create_group_box("Height and Range Filter", [
+            'enable_height_range_filter', 'ground_distance_threshold', 
+            'min_height_and_longest_edge_ratio', 'box_max_length_threshold'
+        ], params))
+
+        layout.addWidget(self.create_group_box("Wall Segmentation", [
+            'enable_wall_segmentation', 'wall_distance_threshold', 
+            'ground_normal_angle_thresh_rad', 'wall_normal_angle_thresh_rad'
+        ], params))
+
         layout.addWidget(self.create_group_box("Other", [
-            'use_pca_box'
+            'use_pca_box', 'max_dimension_ratio'
         ], params))
 
         # 恢复默认按钮
@@ -168,6 +201,9 @@ class ParameterReconfigureGUI(QWidget):
                 value = params[name]
                 if isinstance(value, bool):
                     widget = self.create_checkbox(name, value)
+                elif isinstance(value, str):
+                    # 字符串类型参数，只显示不提供滑块
+                    widget = self.create_label_only(name, value)
                 else:
                     widget = self.create_slider(name, value)
                 layout.addWidget(widget)
@@ -239,6 +275,30 @@ class ParameterReconfigureGUI(QWidget):
             'multiplier': multiplier,
             'is_float': is_float
         }
+        return container
+
+    def create_label_only(self, name, value):
+        """创建只显示的参数控件（用于字符串等非数值类型）"""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        
+        if name in self.param_descriptions:
+            label_text = f"{name}: {self.param_descriptions[name]}"
+        else:
+            label_text = f"{name}:"
+        
+        label = QLabel(label_text)
+        label.setFixedWidth(300)
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        
+        value_label = QLabel(str(value))
+        value_label.setFixedWidth(80)
+        layout.addWidget(value_label)
+        
+        layout.addStretch()
+        
+        self.widgets[name] = {'type': 'string', 'label': label, 'value_label': value_label}
         return container
 
     def set_parameter_from_text(self, name, text_value):
@@ -313,6 +373,9 @@ class ParameterReconfigureGUI(QWidget):
                 slider.blockSignals(False)
                 val_to_set = float(default_val) if is_float else int(default_val)
                 self.set_parameter(name, val_to_set)
+            elif w['type'] == 'string':
+                value_label = w['value_label']
+                value_label.setText(str(default_val))
 
         print("All displayed parameters restored to defaults.")
 

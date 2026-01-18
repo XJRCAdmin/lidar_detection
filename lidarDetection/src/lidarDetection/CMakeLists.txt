@@ -37,7 +37,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(sensing_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
+find_package(ament_index_cpp REQUIRED)
 
 set(dependencies
   rclcpp
@@ -51,6 +51,7 @@ set(dependencies
   tf2_geometry_msgs
   vision_msgs
   sensing_msgs
+  ament_index_cpp
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -129,31 +130,32 @@ target_link_libraries(interface_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
 # target_link_libraries(interface_node ${cpp_typesupport_target})
 
 ##
-# add_executable( static_map_filter_node
-#   src/static_map_filter_node.cpp
-# )
-# target_include_directories(static_map_filter_node
-#   PUBLIC
-#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#     $<INSTALL_INTERFACE:include>
-#     ${PCL_INCLUDE_DIRS}
-# )
-# ament_target_dependencies(static_map_filter_node ${dependencies})
-# target_link_libraries(static_map_filter_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+add_executable(map_launcher_node
+  src/map_launcher.cpp
+)
+target_include_directories(map_launcher_node
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${PCL_INCLUDE_DIRS}
+)
+ament_target_dependencies(map_launcher_node ${dependencies})
+target_link_libraries(map_launcher_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
 # rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-# target_link_libraries(static_map_filter_node ${cpp_typesupport_target})
+# target_link_libraries(map_launcher_node ${cpp_typesupport_target})
 
 ## 
 install(TARGETS
   obstacle_detector_node
   odom_trans_node
   interface_node
-#  static_map_filter_node
+  map_launcher_node
   obstacle_to_baselink_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY include/ DESTINATION include/)
-install(DIRECTORY launch rviz scripts config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch rviz scripts config pcd DESTINATION share/${PROJECT_NAME})
+
 # install(PROGRAMS
 #   scripts/param_tuner.py
 #   DESTINATION lib/${PROJECT_NAME}

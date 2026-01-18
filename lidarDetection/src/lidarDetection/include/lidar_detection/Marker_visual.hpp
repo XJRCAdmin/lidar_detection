@@ -291,16 +291,13 @@ visualization_msgs::msg::MarkerArray StaticObstacleCubeMarker(
     visualization_msgs::msg::Marker marker;
     marker.header = obstacle.detection.header;
     marker.ns = "static_obstacle_bboxes";
-    try {
-      marker.id = std::stoi(obstacle.id);
-    } catch (const std::exception &) {
-      marker.id = static_cast<int>(i);  // 使用索引作为备用ID
-    }
+    marker.id = static_cast<int>(i);  // 使用索引作为备用ID
+
     marker.action = visualization_msgs::msg::Marker::ADD;
     marker.frame_locked = false;
 
     marker.lifetime.sec = 0;
-    marker.lifetime.nanosec = 150000000;  // 0.15s
+    marker.lifetime.nanosec = 300000000;  // 0.15s
 
     marker.type = visualization_msgs::msg::Marker::CUBE;
     marker.pose = obstacle.detection.bbox.center;

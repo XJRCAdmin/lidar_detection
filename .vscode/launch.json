@@ -6,17 +6,21 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/install/${input:package}/lib/${input:package}/${input:node}",
-      "args": ["launch", "obstacle", "go2.launch.py"],
+      "args": [
+        "--ros-args",
+        "--params-file",
+        "${workspaceFolder}/lidarDetection/src/lidarDetection/config/go2.yaml"
+      ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [
         {
           "name": "AMENT_PREFIX_PATH",
-          "value": "${workspaceFolder}/install/${input:package}:/opt/ros/foxy"
+          "value": "${workspaceFolder}/install/${input:package}:/opt/ros/humble"
         },
         {
           "name": "LD_LIBRARY_PATH",
-          "value": "${workspaceFolder}/install/${input:package}/lib:/opt/ros/foxy/lib"
+          "value": "${workspaceFolder}/install/${input:package}/lib:/opt/ros/humble/lib"
         }
       ],
       "externalConsole": false,

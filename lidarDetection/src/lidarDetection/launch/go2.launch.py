@@ -94,10 +94,10 @@ def generate_launch_description():
     #     parameters=[config_file]
     # )
 
-    static_map_filter_node = Node(
+    map_launcher_node = Node(
         package='lidar_detection',
-        executable='static_map_filter_node',
-        name='static_map_filter_node',
+        executable='map_launcher_node',
+        name='map_launcher_node',
         output='screen',
         parameters=[config_file]
     )
@@ -129,7 +129,7 @@ def generate_launch_description():
         actions=[
             odom_trans_node,
             obstacle_to_baselink_node,
-       #     static_map_filter_node
+            map_launcher_node
         ]
     )
     
