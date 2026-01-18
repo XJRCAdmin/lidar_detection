@@ -15,6 +15,7 @@ git fetch --all --tags
 # 切换到 4.0.4 或更早版本，这是支持 Foxy 的最后一个稳定大版本
 git checkout 4.0.4
 ```
+如果您是humble，则可以采用4.56.4版本，正如本仓库的humble分支。
 
 # 依赖
 一些依赖:

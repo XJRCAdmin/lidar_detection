@@ -7,6 +7,7 @@
 #include <rclcpp/qos.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/header.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "lidar_detection/msg/obstacle_detection.hpp"
@@ -382,8 +383,10 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
 
   // Prepare segmented cloud pointers
   std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmented_clouds_ptr;
-  segmented_clouds_ptr.first = boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();   // obstacle cloud
-  segmented_clouds_ptr.second = boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();  // ground cloud
+  segmented_clouds_ptr.first =
+    pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());  // obstacle cloud
+  segmented_clouds_ptr.second =
+    pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());  // ground cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr wall_cloud_ptr;
 
   if (GROUND_SEGMENT_TYPE == "RANSAC") {
@@ -799,13 +802,15 @@ lidar_detection::msg::ObstacleDetection ObstacleDetectorNode::boxToDetection3D(
   obstacle_detection.detection.bbox.size.z = box.dimension(2);
 
   vision_msgs::msg::ObjectHypothesisWithPose hypothesis;
-  hypothesis.id = std::to_string(box.id);
+
+  hypothesis.hypothesis.class_id = std::to_string(box.id);
   hypothesis.pose.pose.position = obstacle_detection.detection.bbox.center.position;
   hypothesis.pose.pose.orientation = obstacle_detection.detection.bbox.center.orientation;
   obstacle_detection.detection.results.push_back(hypothesis);
 
-  pcl::toROSMsg(*cluster, obstacle_detection.detection.source_cloud);
-  obstacle_detection.detection.source_cloud.header = header;
+  RCLCPP_DEBUG(this->get_logger(), "cluster header: %s", cluster->header.frame_id.c_str());
+  // pcl::toROSMsg(*cluster, obstacle_detection.detection.source_cloud);
+  // obstacle_detection.detection.source_cloud.header = header;
 
   geometry_msgs::msg::Twist twist;
   twist.linear.x = box.velocity(0);
@@ -858,12 +863,21 @@ std::vector<geometry_msgs::msg::Point32> ObstacleDetectorNode::calculateBoxVerti
   return global_corners;
 }
 
+/**
+ * @brief 发布障碍物角点可视化标记
+ * 
+ * 该函数为输入的障碍物盒子集合创建两种类型的可视化标记：
+ * 1. 表示凸包角点的点云标记
+ * 2. 连接8个顶点的线段标记以显示完整的边界框形状
+ * 
+ * @param boxes 障碍物盒子集合
+ * @param header ROS消息头，包含时间戳和坐标系信息
+ */
 void ObstacleDetectorNode::publishCornerMarkers(const std::vector<Box> & boxes, const std_msgs::msg::Header & header)
 {
   visualization_msgs::msg::MarkerArray corners_vis;
   int mid = 0;
   for (const auto & box : boxes) {
-    // 1) 代表性角点 POINTS（来自 Box::convex_hull）
     visualization_msgs::msg::Marker pts;
     pts.header = header;
     pts.ns = "rep_corners";
@@ -884,7 +898,6 @@ void ObstacleDetectorNode::publishCornerMarkers(const std::vector<Box> & boxes, 
     }
     corners_vis.markers.push_back(pts);
 
-    // 2) 8 个顶点连线 LINE_STRIP（来自 calculateBoxVertices ）
     auto full_corners = calculateBoxVertices(box.position, box.dimension, box.quaternion);
     visualization_msgs::msg::Marker lines;
     lines.header = header;

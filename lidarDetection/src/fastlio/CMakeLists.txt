@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.8)
 project(fast_lio)
 
+
+if(DEFINED HUMBLE_ROS)
+  message(STATUS "HUMBLE_ROS variable is set to: ${HUMBLE_ROS}")
+endif()
+
+if(DEFINED ROS_EDITION)
+  message(STATUS "ROS_EDITION variable is set to: ${ROS_EDITION}")
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()

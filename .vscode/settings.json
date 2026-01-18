@@ -1,10 +1,11 @@
 {
-  // "[cpp]": {
-  //   "editor.defaultFormatter": "ms-vscode.cpptools"
-  // },
-  // "[c]": {
-  //   "editor.defaultFormatter": "ms-vscode.cpptools"
-  // },
-  // "C_Cpp.clang_format_style": "file",
-  // "C_Cpp.clang_format_path": "/usr/bin/clang-format"
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format",
+    "editor.formatOnSave": true
+  },
+  "C_Cpp.clang_format_style": "file",
+  "C_Cpp.clang_format_path": "/usr/bin/clang-format",
+  "C_Cpp.formatting": "clang-format",
+  "editor.defaultFormatter": "xaver.clang-format",
+  "editor.formatOnSave": true
 }

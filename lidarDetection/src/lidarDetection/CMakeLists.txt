@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.5)
 project(lidar_detection)
 
+if(DEFINED HUMBLE_ROS)
+  message(STATUS "HUMBLE_ROS variable is set to: ${HUMBLE_ROS}")
+endif()
+
+if(DEFINED ROS_EDITION)
+  message(STATUS "ROS_EDITION variable is set to: ${ROS_EDITION}")
+endif()
+
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -54,6 +62,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES vision_msgs std_msgs geometry_msgs
 )
 
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+## 
 add_executable(obstacle_detector_node
   src/obstacle_detector.cpp
   src/utils.cpp
@@ -65,8 +76,10 @@ target_include_directories(obstacle_detector_node
     ${PCL_INCLUDE_DIRS}
 )
 ament_target_dependencies(obstacle_detector_node ${dependencies})
-target_link_libraries(obstacle_detector_node ${PCL_LIBRARIES})
-rosidl_target_interfaces(obstacle_detector_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(obstacle_detector_node
+  ${PCL_LIBRARIES}
+  ${cpp_typesupport_target}
+)
 
 ##
 add_executable(odom_trans_node
@@ -80,8 +93,9 @@ target_include_directories(odom_trans_node
     ${PCL_INCLUDE_DIRS}
 )
 ament_target_dependencies(odom_trans_node ${dependencies})
-target_link_libraries(odom_trans_node ${PCL_LIBRARIES})
-rosidl_target_interfaces(odom_trans_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(odom_trans_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+# rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(odom_trans_node ${cpp_typesupport_target})
 
 ## 
 add_executable(obstacle_to_baselink_node
@@ -95,8 +109,9 @@ target_include_directories(obstacle_to_baselink_node
     ${PCL_INCLUDE_DIRS}
 )
 ament_target_dependencies(obstacle_to_baselink_node ${dependencies})
-target_link_libraries(obstacle_to_baselink_node ${PCL_LIBRARIES})
-rosidl_target_interfaces(obstacle_to_baselink_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(obstacle_to_baselink_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+# rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(obstacle_to_baselink_node ${cpp_typesupport_target})
 
 ## 
 add_executable(interface_node
@@ -109,8 +124,9 @@ target_include_directories(interface_node
     ${PCL_INCLUDE_DIRS}
 )
 ament_target_dependencies(interface_node ${dependencies})
-target_link_libraries(interface_node ${PCL_LIBRARIES})
-rosidl_target_interfaces(interface_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(interface_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+# rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(interface_node ${cpp_typesupport_target})
 
 ##
 # add_executable( static_map_filter_node
@@ -123,8 +139,9 @@ rosidl_target_interfaces(interface_node ${PROJECT_NAME} "rosidl_typesupport_cpp"
 #     ${PCL_INCLUDE_DIRS}
 # )
 # ament_target_dependencies(static_map_filter_node ${dependencies})
-# target_link_libraries(static_map_filter_node ${PCL_LIBRARIES})
-# rosidl_target_interfaces(static_map_filter_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(static_map_filter_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+# rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+# target_link_libraries(static_map_filter_node ${cpp_typesupport_target})
 
 ## 
 install(TARGETS
