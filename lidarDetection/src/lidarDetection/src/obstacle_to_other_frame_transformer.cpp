@@ -15,7 +15,7 @@
 
 using std::placeholders::_1;
 
-class ObstacleToBaselinkNode : public rclcpp::Node
+class ObstacleToOtherFrameNode : public rclcpp::Node
 {
 private:
   tf2_ros::Buffer tf_buffer_;
@@ -33,6 +33,7 @@ private:
   double smoothing_alpha_;
   double match_position_thresh_;
   double match_size_ratio_thresh_;
+  std::string visualization_mode_;
 
   lidar_detection::msg::ObstacleDetectionArray static_obstacle_cache_;
   lidar_detection::msg::ObstacleDetectionArray dynamic_obstacle_cache_;
@@ -40,13 +41,25 @@ private:
   rclcpp::Subscription<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr obstacle_lidar_sub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr static_obstacle_to_baselink_pub_;
   rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr dynamic_obstacle_to_baselink_pub_;
+  rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr static_obstacle_to_map_pub_;
+  rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr dynamic_obstacle_to_map_pub_;
+
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr static_obstacle_markers_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_text_markers_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_cube_markers_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_array_markers_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr static_obstacle_markers_to_map_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_cube_markers_to_map_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_text_markers_to_map_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr dynamic_obstacle_array_markers_to_map_pub_;
+
+  rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr
+    static_obstacle_pub_;  //lidar body 系的静态障碍物
+  rclcpp::Publisher<lidar_detection::msg::ObstacleDetectionArray>::SharedPtr dynamic_obstacle_pub_;
 
 public:
-  ObstacleToBaselinkNode() : Node("obstacle_to_baselink_node"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_)
+  ObstacleToOtherFrameNode()
+  : Node("obstacle_to_other_frame_node"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_)
   {
     obstacle_lidar_topic_ = this->declare_parameter<std::string>("obstacle_lidar_topic", "/detected_objects");
     dynamic_obstacle_baselink_topic_ =
@@ -63,9 +76,17 @@ public:
     smoothing_alpha_ = this->declare_parameter<double>("smoothing_alpha", 0.7);
     match_position_thresh_ = this->declare_parameter<double>("match_position_thresh", 0.5);
     match_size_ratio_thresh_ = this->declare_parameter<double>("match_size_ratio_thresh", 0.3);
+    visualization_mode_ = this->declare_parameter<std::string>("visualization_mode", "map");
+
+    this->get_parameter("smoothing_alpha", smoothing_alpha_);
+    this->get_parameter("match_position_thresh", match_position_thresh_);
+    this->get_parameter("match_size_ratio_thresh", match_size_ratio_thresh_);
+    this->get_parameter("visualization_mode", visualization_mode_);
+    this->get_parameter("AlignObstacleToFrame", AlignObstacleToFrame_);
+    this->get_parameter("static_velocity_thresh", static_velocity_thresh_);
 
     obstacle_lidar_sub_ = this->create_subscription<lidar_detection::msg::ObstacleDetectionArray>(
-      obstacle_lidar_topic_, 10, std::bind(&ObstacleToBaselinkNode::ObstacleCallback, this, std::placeholders::_1));
+      obstacle_lidar_topic_, 10, std::bind(&ObstacleToOtherFrameNode::ObstacleCallback, this, std::placeholders::_1));
     dynamic_obstacle_to_baselink_pub_ =
       this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>(dynamic_obstacle_baselink_topic_, 100);
     static_obstacle_to_baselink_pub_ =
@@ -80,7 +101,26 @@ public:
     dynamic_obstacle_cube_markers_pub_ =
       this->create_publisher<visualization_msgs::msg::MarkerArray>("/dynamic_obstacle_cube_markers", 1000);
 
-    RCLCPP_INFO(this->get_logger(), "Obstacle To Baselink Node Started");
+    // map系下的静态障碍物可视化话题
+    static_obstacle_markers_to_map_pub_ =
+      this->create_publisher<visualization_msgs::msg::MarkerArray>("/static_obstacle_markers_in_map", 1000);
+    dynamic_obstacle_cube_markers_to_map_pub_ =
+      this->create_publisher<visualization_msgs::msg::MarkerArray>("/dynamic_obstacle_cube_in_map", 1000);
+    dynamic_obstacle_text_markers_to_map_pub_ =
+      this->create_publisher<visualization_msgs::msg::MarkerArray>("/dynamic_obstacle_text_in_map", 1000);
+    dynamic_obstacle_array_markers_to_map_pub_ =
+      this->create_publisher<visualization_msgs::msg::MarkerArray>("/dynamic_obstacle_array_in_map", 1000);
+    static_obstacle_to_map_pub_ =
+      this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>("/static_obstacle_in_map", 1000);
+    dynamic_obstacle_to_map_pub_ =
+      this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>("/dynamic_obstacle_in_map", 1000);
+
+    static_obstacle_pub_ =
+      this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>("/static_obstacle_in_lidar_body", 100);
+    dynamic_obstacle_pub_ =
+      this->create_publisher<lidar_detection::msg::ObstacleDetectionArray>("/dynamic_obstacle_in_lidar_body", 100);
+
+    RCLCPP_INFO(this->get_logger(), "Obstacle To Other Frame Node Started");
     RCLCPP_INFO(this->get_logger(), "Obstacle lidar topic: %s", obstacle_lidar_topic_.c_str());
     RCLCPP_INFO(this->get_logger(), "Obstacle baselink topic: %s", obstacle_baselink_topic_.c_str());
     RCLCPP_INFO(this->get_logger(), "Transform from '%s' to '%s'", source_frame_.c_str(), target_frame_.c_str());
@@ -113,7 +153,7 @@ public:
         abs(detection.twist.linear.y) <= static_velocity_thresh_ &&
         abs(detection.twist.linear.z) <= static_velocity_thresh_)  // 其实z都是0
       {
-        detection.twist.linear.x = 0.0;  // 将速度置0
+        detection.twist.linear.x = 0.0;
         detection.twist.linear.y = 0.0;
         detection.twist.linear.z = 0.0;
         static_obstacle_msgs.detections.push_back(detection);
@@ -122,13 +162,39 @@ public:
       }
     }
 
-    TransformObstacle(transition_frame_, target_frame_, static_obstacle_msgs, baselink_static_obstacle_msgs);
-    TransformObstacle(transition_frame_, target_frame_, dynamic_obstacle_msgs, baselink_dynamic_obstacle_msgs);
+    if (visualization_mode_ == "map") {
+      if (AlignObstacleToFrame_) {
+        AlignObstacleToFrame(static_obstacle_msgs);
+        AlignObstacleToFrame(dynamic_obstacle_msgs);
+      }
 
-    if (AlignObstacleToFrame_) {
-      AlignObstacleToFrame(baselink_static_obstacle_msgs);
-      AlignObstacleToFrame(baselink_dynamic_obstacle_msgs);
+      ApplySmoothing(static_obstacle_msgs, static_obstacle_cache_);
+      ApplySmoothing(dynamic_obstacle_msgs, dynamic_obstacle_cache_);
 
+      static_obstacle_markers = StaticObstacleCubeMarker(static_obstacle_msgs);
+      dynamic_obstacle_text_markers = DynamicObstacleTextMarker(dynamic_obstacle_msgs);
+      dynamic_obstacle_array_markers = DynamicObstacleArrayMarker(dynamic_obstacle_msgs);
+      dynamic_obstacle_cube_markers = DynamicObstacleCubeMarker(dynamic_obstacle_msgs);
+
+      static_obstacle_to_map_pub_->publish(static_obstacle_msgs);
+      dynamic_obstacle_to_map_pub_->publish(dynamic_obstacle_msgs);
+
+      // 可视化
+      ScaleMarkerAlpha(static_obstacle_markers, 0.5f);
+      static_obstacle_markers_to_map_pub_->publish(static_obstacle_markers);
+      ScaleMarkerAlpha(dynamic_obstacle_cube_markers, 0.5f);
+      dynamic_obstacle_text_markers_to_map_pub_->publish(dynamic_obstacle_text_markers);
+      dynamic_obstacle_array_markers_to_map_pub_->publish(dynamic_obstacle_array_markers);
+      dynamic_obstacle_cube_markers_to_map_pub_->publish(dynamic_obstacle_cube_markers);
+
+    } else if (visualization_mode_ == "baselink") {
+      TransformObstacle(transition_frame_, target_frame_, static_obstacle_msgs, baselink_static_obstacle_msgs);
+      TransformObstacle(transition_frame_, target_frame_, dynamic_obstacle_msgs, baselink_dynamic_obstacle_msgs);
+
+      if (AlignObstacleToFrame_) {
+        AlignObstacleToFrame(baselink_static_obstacle_msgs);
+        AlignObstacleToFrame(baselink_dynamic_obstacle_msgs);
+      }
       ApplySmoothing(baselink_static_obstacle_msgs, static_obstacle_cache_);
       ApplySmoothing(baselink_dynamic_obstacle_msgs, dynamic_obstacle_cache_);
 
@@ -136,23 +202,38 @@ public:
       dynamic_obstacle_text_markers = DynamicObstacleTextMarker(baselink_dynamic_obstacle_msgs);
       dynamic_obstacle_array_markers = DynamicObstacleArrayMarker(baselink_dynamic_obstacle_msgs);
       dynamic_obstacle_cube_markers = DynamicObstacleCubeMarker(baselink_dynamic_obstacle_msgs);
-    } else {
+
+      static_obstacle_to_baselink_pub_->publish(baselink_static_obstacle_msgs);
+      dynamic_obstacle_to_baselink_pub_->publish(baselink_dynamic_obstacle_msgs);
+
+      // 可视化
+      ScaleMarkerAlpha(static_obstacle_markers, 0.5f);
+      static_obstacle_markers_pub_->publish(static_obstacle_markers);
+      ScaleMarkerAlpha(dynamic_obstacle_cube_markers, 0.5f);
+      dynamic_obstacle_cube_markers_pub_->publish(dynamic_obstacle_cube_markers);
+      dynamic_obstacle_text_markers_pub_->publish(dynamic_obstacle_text_markers);
+      dynamic_obstacle_array_markers_pub_->publish(dynamic_obstacle_array_markers);
+
+    } else if (visualization_mode_ == "lidar_body") {
+      ApplySmoothing(static_obstacle_msgs, static_obstacle_cache_);
+      ApplySmoothing(dynamic_obstacle_msgs, dynamic_obstacle_cache_);
+
       static_obstacle_markers = StaticObstacleCubeMarker(static_obstacle_msgs);
       dynamic_obstacle_text_markers = DynamicObstacleTextMarker(dynamic_obstacle_msgs);
       dynamic_obstacle_array_markers = DynamicObstacleArrayMarker(dynamic_obstacle_msgs);
       dynamic_obstacle_cube_markers = DynamicObstacleCubeMarker(dynamic_obstacle_msgs);
+
+      static_obstacle_pub_->publish(static_obstacle_msgs);
+      dynamic_obstacle_pub_->publish(dynamic_obstacle_msgs);
+
+      // 可视化
+      ScaleMarkerAlpha(static_obstacle_markers, 0.5f);
+      static_obstacle_markers_pub_->publish(static_obstacle_markers);
+      ScaleMarkerAlpha(dynamic_obstacle_cube_markers, 0.5f);
+      dynamic_obstacle_cube_markers_pub_->publish(dynamic_obstacle_cube_markers);
+      dynamic_obstacle_text_markers_pub_->publish(dynamic_obstacle_text_markers);
+      dynamic_obstacle_array_markers_pub_->publish(dynamic_obstacle_array_markers);
     }
-
-    static_obstacle_to_baselink_pub_->publish(baselink_static_obstacle_msgs);
-    dynamic_obstacle_to_baselink_pub_->publish(baselink_dynamic_obstacle_msgs);
-
-    // 可视化
-    ScaleMarkerAlpha(static_obstacle_markers, 0.5f);
-    static_obstacle_markers_pub_->publish(static_obstacle_markers);
-    ScaleMarkerAlpha(dynamic_obstacle_cube_markers, 0.5f);
-    dynamic_obstacle_cube_markers_pub_->publish(dynamic_obstacle_cube_markers);
-    dynamic_obstacle_text_markers_pub_->publish(dynamic_obstacle_text_markers);
-    dynamic_obstacle_array_markers_pub_->publish(dynamic_obstacle_array_markers);
   }
 
   /**
@@ -225,6 +306,7 @@ public:
       custom_obstacle_array_msg.detections.push_back(custom_obstacle_msg);
     }
   }
+
   void AlignObstacleToFrame(lidar_detection::msg::ObstacleDetectionArray & obstacle_msg_Array)
   {
     for (auto & detection_msg : obstacle_msg_Array.detections) {
@@ -259,7 +341,7 @@ public:
 
       const Eigen::Vector3d aligned_center = 0.5 * (max_pt + min_pt);
       Eigen::Vector3d aligned_size = max_pt - min_pt;
-      aligned_size = aligned_size.cwiseMax(Eigen::Vector3d::Zero());  // 数值稳定
+      aligned_size = aligned_size.cwiseMax(Eigen::Vector3d::Zero());
 
       bbox.center.position.x = aligned_center.x();
       bbox.center.position.y = aligned_center.y();
@@ -286,7 +368,6 @@ public:
     double dz = bbox1.center.position.z - bbox2.center.position.z;
     double position_dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-    // 计算尺寸差异（使用对称差异比率）
     auto compute_size_diff = [](double s1, double s2) {
       double max_size = std::max(s1, s2);
       if (max_size < 1e-6) return 0.0;
@@ -313,7 +394,6 @@ public:
     lidar_detection::msg::ObstacleDetectionArray & obstacle_cache)
   {
     if (obstacle_cache.detections.empty()) {
-      // 首帧，直接缓存
       obstacle_cache = current_obstacles;
       return;
     }
@@ -364,7 +444,7 @@ public:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<ObstacleToBaselinkNode>();
+  auto node = std::make_shared<ObstacleToOtherFrameNode>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

@@ -370,7 +370,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
   sensor_msgs::msg::PointCloud2 cloud_statistical_msg;
   pcl::toROSMsg(*statistical_filtered_cloud, cloud_statistical_msg);
   cloud_statistical_msg.header = pointcloud_header;
-  pub_cloud_after_statistical_removal->publish(cloud_statistical_msg);
+  // pub_cloud_after_statistical_removal->publish(cloud_statistical_msg);
 
   // Downsampleing, ROI
   auto filtered_cloud = obstacle_detector->filterCloud(
@@ -404,7 +404,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
       sensor_msgs::msg::PointCloud2 cloud_segmented_wall_msg;
       pcl::toROSMsg(*wall_cloud_ptr, cloud_segmented_wall_msg);
       cloud_segmented_wall_msg.header = pointcloud_header;
-      pub_cloud_segmentation_wall_pointer->publish(cloud_segmented_wall_msg);
+      // pub_cloud_segmentation_wall_pointer->publish(cloud_segmented_wall_msg);
 
     } else {
       RCLCPP_INFO(logger, "Using RANSAC for ground segmentation only");
@@ -418,12 +418,12 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
   sensor_msgs::msg::PointCloud2 cloud_segmented_first_msg;
   pcl::toROSMsg(*segmented_clouds_ptr.first, cloud_segmented_first_msg);
   cloud_segmented_first_msg.header = pointcloud_header;
-  pub_cloud_after_segmentation_first_pointer->publish(cloud_segmented_first_msg);
+  // pub_cloud_after_segmentation_first_pointer->publish(cloud_segmented_first_msg);
   // 发布分割后的第二个点云（地面云）,调试使用 等于 /cloud_ground
   sensor_msgs::msg::PointCloud2 cloud_segmented_second_msg;
   pcl::toROSMsg(*segmented_clouds_ptr.second, cloud_segmented_second_msg);
   cloud_segmented_second_msg.header = pointcloud_header;
-  pub_cloud_after_segmentation_second_pointer->publish(cloud_segmented_second_msg);
+  // pub_cloud_after_segmentation_second_pointer->publish(cloud_segmented_second_msg);
 
   auto cloud_clusters =
     obstacle_detector->clustering(segmented_clouds_ptr.first, CLUSTER_THRESH, CLUSTER_MIN_SIZE, CLUSTER_MAX_SIZE);
@@ -437,7 +437,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
   sensor_msgs::msg::PointCloud2 clusters_msg;
   pcl::toROSMsg(*merged_clusters_cloud, clusters_msg);
   clusters_msg.header = pointcloud_header;
-  pub_cloud_clustered_original_->publish(clusters_msg);
+  // pub_cloud_clustered_original_->publish(clusters_msg);
   RCLCPP_INFO(
     this->get_logger(), "Published clusters cloud: %zu points, %zu clusters", merged_clusters_cloud->size(),
     cloud_clusters.size());
@@ -606,8 +606,15 @@ void ObstacleDetectorNode::publishDetectedObjects(
     auto it = bbox_size_history_.find(box.id);
     if (it != bbox_size_history_.end()) {
       const Eigen::Vector3f prev = it->second;
-      box.dimension = size_smooth_factor_ * box.dimension + (1.0f - size_smooth_factor_) * prev;
+      // 物体z轴不固定版本
+      // box.dimension = size_smooth_factor_ * box.dimension + (1.0f - size_smooth_factor_) * prev;
+      // 物体z轴固定版本
+      box.dimension.x() = size_smooth_factor_ * box.dimension.x() + (1.0f - size_smooth_factor_) * prev.x();
+      box.dimension.y() = size_smooth_factor_ * box.dimension.y() + (1.0f - size_smooth_factor_) * prev.y();
+      box.dimension.z() = prev.z();
       box.dimension = box.dimension.cwiseMax(Eigen::Vector3f::Constant(1e-3f));  // avoid zero dimension
+    } else {
+      bbox_size_history_[box.id] = box.dimension;
     }
     bbox_size_history_[box.id] = box.dimension;
     curr_boxes_.emplace_back(box);
@@ -921,7 +928,7 @@ void ObstacleDetectorNode::publishCornerMarkers(const std::vector<Box> & boxes, 
     }
     corners_vis.markers.push_back(lines);
   }
-  pub_representative_corners_->publish(corners_vis);
+  // pub_representative_corners_->publish(corners_vis);
 }
 
 }  // namespace lidar_detection

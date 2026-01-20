@@ -38,8 +38,8 @@
             fov_degree: 360.0
             det_range: 100.0
             gravity_align: true # true to align the z axis of world frame with the direction of gravity, and the gravity direction should be specified below
-            gravity: [ 0.0, 0.0, -9.810 ] # [0.0, 9.810, 0.0] # gravity to be aligned
-            gravity_init: [ 0.0, 0.0, -9.810 ] # [0.0, 9.810, 0.0] # # preknown gravity in the first IMU body frame, use when imu_en is false or start from a non-stationary state
+            gravity: [2.209989, 0.234393, -9.568671] # [0.0, 9.810, 0.0] # gravity to be aligned
+            gravity_init: [2.209989, 0.234393, -9.568671]  # [0.0, 9.810, 0.0] # # preknown gravity in the first IMU body frame, use when imu_en is false or start from a non-stationary state
             extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
             extrinsic_R: [ 1.0, 0.0, 0.0,
                            0.0, 1.0, 0.0,

@@ -103,7 +103,7 @@ public:
     robot_state.twist = odom_msg->twist.twist;
     robot_state.radius = this->robot_radius_;
 
-    robot_state_pub_->publish(robot_state);
+    // robot_state_pub_->publish(robot_state);
   }
 
   // 只发布最近的一个障碍物的信息,obstacle_detection_array是当前ros帧下所有障碍物的信息
@@ -139,7 +139,7 @@ public:
 
     const auto & size = best_detection.detection.bbox.size;
     msg.radius = 0.5 * std::max({size.x, size.y, size.z});
-    relative_ball_pub_->publish(msg);
+    // relative_ball_pub_->publish(msg);
   }
   void ObstacleMapCallback(const lidar_detection::msg::ObstacleDetectionArray::SharedPtr obstacle_msg)
   {
@@ -202,7 +202,7 @@ public:
     const auto & size = best_detection.detection.bbox.size;
     ball_state.radius = 0.5 * std::max({size.x, size.y, size.z});
 
-    map_ball_pub_->publish(ball_state);
+    // map_ball_pub_->publish(ball_state);
   }
 };
 

@@ -18,6 +18,7 @@ colcon build \
 
 ```bash
 ros2 bag record -s mcap -a -o my_mcap_bag
+
 ```
 - [lidarDetection README](lidarDetection/README.md)
 - [CHANGELOG](lidarDetection/CHANGELOG.md)

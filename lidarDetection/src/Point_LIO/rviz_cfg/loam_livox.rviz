@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /TF1
         - /CloudRegistered1
         - /CloudEffected1
         - /CloudEffected1/Topic1
@@ -47,7 +48,7 @@ Visualization Manager:
       Name: TF
       Show Arrows: true
       Show Axes: true
-      Show Names: false
+      Show Names: true
       Tree:
         odom:
           lidar_body:
@@ -124,15 +125,15 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.579988718032837
-        Min Value: -0.5953037738800049
+        Max Value: 5.124903202056885
+        Min Value: -1.3867876529693604
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
       Color Transformer: AxisColor
-      Decay Time: 30
+      Decay Time: 3000
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -192,8 +193,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.823111057281494
-        Min Value: -0.4285303056240082
+        Max Value: 5.12266731262207
+        Min Value: -0.5538513660430908
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -269,7 +270,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.260145664215088
+      Distance: 2.041698455810547
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -284,10 +285,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4350377917289734
+      Pitch: -0.1949622929096222
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.0693435668945312
+      Yaw: 2.5743494033813477
     Saved: ~
 Window Geometry:
   Displays:
@@ -305,5 +306,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1453
-  X: 1107
-  Y: 498
+  X: 973
+  Y: 525

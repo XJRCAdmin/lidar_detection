@@ -1,3 +1,9 @@
 ultralytics
 pyrealsense2
 openvino
+onnxruntime
+torch
+opencv-python
+open3d
+numpy<2.0.0  # Fix numpy compatibility issue with cv_bridge
+onnxruntime-gpu

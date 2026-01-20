@@ -35,3 +35,10 @@
 调试需要`livox_ros_driver2`的lidar ip被修改了,拉取的时候记得修改回go2身上的mid360的ip.还有就是yaml配置文件中也做了相应的修改,可以在`lidar_detection/config/go2.yaml`中查看,相关的参数调节可以参考`go2.yaml`中的注释说明.
 
 如果有什么漏写的可以及时联系~
+
+
+# 本机器录制ros2bag
+```
+source xxx/install/setup.bash
+ros2 bag record -s mcap -a --exclude "/integrated_joy" -o flat-c2-fix-map-lidar
+```

@@ -114,16 +114,16 @@ UKF::UKF()
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.0;
+  std_a_ = 0.4;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = M_PI / 6.0;
+  std_yawdd_ = M_PI / 12.0;
 
   // Laser measurement noise standard deviation position1 in m
-  std_laspx_ = 0.15;
+  std_laspx_ = 0.30;
 
   // Laser measurement noise standard deviation position2 in m
-  std_laspy_ = 0.15;
+  std_laspy_ = 0.30;
 
   // dimension of state vector
   n_x_ = 5;

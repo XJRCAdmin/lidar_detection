@@ -47,9 +47,9 @@ def generate_launch_description():
         name='map_to_odom_publisher',
         output='screen',
         arguments=[
-        '0.0', '0.0', '0.0',    # New Translation: x, y, z
-        '0.0', '0.0', '0.0',     # New Rotation: yaw, pitch, roll
-        'map', 'odom'                 # frames
+        '0.1729', '0.0', '0.4066',    # New Translation: x, y, z
+        '0.0', '0.191986', '0.0',     # New Rotation: yaw, pitch, roll
+        'map', 'odom'  
         ]
     )
 
@@ -69,10 +69,10 @@ def generate_launch_description():
         parameters=[config_file]
     )
 
-    obstacle_to_baselink_node = Node(
+    obstacle_to_other_frame_node = Node(
         package='lidar_detection',
-        executable='obstacle_to_baselink_node',
-        name='obstacle_to_baselink_node',
+        executable='obstacle_to_other_frame_node',
+        name='obstacle_to_other_frame_node',
         output='screen',
         parameters=[config_file]
     )
@@ -85,14 +85,6 @@ def generate_launch_description():
         parameters=[config_file]
     )
 
-
-    # pointcloud_to_livox_frame_transformer_node = Node(
-    #     package='lidar_detection',
-    #     executable='pointcloud_to_livox_frame_transformer_node',
-    #     name='pointcloud_to_livox_frame_transformer_node',
-    #     output='screen',
-    #     parameters=[config_file]
-    # )
 
     map_launcher_node = Node(
         package='lidar_detection',
@@ -128,7 +120,7 @@ def generate_launch_description():
         period=3.5,
         actions=[
             odom_trans_node,
-            obstacle_to_baselink_node,
+            obstacle_to_other_frame_node,
             map_launcher_node
         ]
     )

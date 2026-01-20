@@ -24,7 +24,6 @@ visualization_msgs::msg::Marker makeFootprintOrCubeMarker(
   // 设置 lifetime 为 0.15s
   m.lifetime.sec = 0;
   m.lifetime.nanosec = 150000000;  // 0.15s
-
   m.type = visualization_msgs::msg::Marker::CUBE;
   m.pose = pose;
   m.scale.x = box.dimension(0);

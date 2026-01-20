@@ -99,18 +99,18 @@ target_link_libraries(odom_trans_node ${PCL_LIBRARIES} ${cpp_typesupport_target}
 # target_link_libraries(odom_trans_node ${cpp_typesupport_target})
 
 ## 
-add_executable(obstacle_to_baselink_node
-  src/obstacle_to_baselink_transformer.cpp
+add_executable(obstacle_to_other_frame_node
+  src/obstacle_to_other_frame_transformer.cpp
   src/utils.cpp
 )
-target_include_directories(obstacle_to_baselink_node
+target_include_directories(obstacle_to_other_frame_node
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
     ${PCL_INCLUDE_DIRS}
 )
-ament_target_dependencies(obstacle_to_baselink_node ${dependencies})
-target_link_libraries(obstacle_to_baselink_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
+ament_target_dependencies(obstacle_to_other_frame_node ${dependencies})
+target_link_libraries(obstacle_to_other_frame_node ${PCL_LIBRARIES} ${cpp_typesupport_target})
 # rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # target_link_libraries(obstacle_to_baselink_node ${cpp_typesupport_target})
 
@@ -150,7 +150,7 @@ install(TARGETS
   odom_trans_node
   interface_node
   map_launcher_node
-  obstacle_to_baselink_node
+  obstacle_to_other_frame_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY include/ DESTINATION include/)
