@@ -7,3 +7,6 @@ realsense/yolo_realsense/models/yolov11s_openvino_model/
 realsense/yolo_realsense/models/*.pt
 realsense/yolo_realsense/models/*.onnx
 realsense/yolo_realsense/yolo_realsense/__pycache__
+lidarDetection/src/Point_LIO_pre.zip
+lidarDetection/src/lidarDetection/pcd/*.pcd
+lidarDetection/src/lidarDetection/pcd/justify

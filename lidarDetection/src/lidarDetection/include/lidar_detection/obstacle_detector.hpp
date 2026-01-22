@@ -72,6 +72,10 @@ public:
   std::vector<typename pcl::PointCloud<PointT>::Ptr> computeConvexHulls(
     const std::vector<typename pcl::PointCloud<PointT>::Ptr> & cloud_clusters);
 
+  std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> segmentGround(
+    const typename pcl::PointCloud<PointT>::ConstPtr & cloud, const int max_iterations, const float distance_thresh,
+    float ground_normal_angle_thresh_rad);
+
   Box axisAlignedBoundingBox(const typename pcl::PointCloud<PointT>::ConstPtr & cluster, const int id);
 
   Box pcaBoundingBox(typename pcl::PointCloud<PointT>::Ptr & cluster, const int id);
@@ -349,6 +353,38 @@ ObstacleDetector<PointT>::segmentPlane(
   seg.setMaxIterations(max_iterations);
   seg.setDistanceThreshold(distance_thresh);
 
+  // Segment the largest planar component from the input cloud
+  seg.setInputCloud(cloud);
+  seg.segment(*inliers, *coefficients);
+  if (inliers->indices.empty()) {
+    RCLCPP_WARN(logger, "Could not estimate a planar model for the given dataset.");
+  }
+
+  return separateClouds(inliers, cloud);
+}
+
+template <typename PointT>
+std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr>
+ObstacleDetector<PointT>::segmentGround(
+  const typename pcl::PointCloud<PointT>::ConstPtr & cloud, const int max_iterations, const float distance_thresh,
+  float ground_normal_angle_thresh_rad)
+{
+  auto logger = rclcpp::get_logger("obstacle_detector");
+
+  // Find inliers for the cloud.
+  pcl::SACSegmentation<PointT> seg;
+  pcl::PointIndices::Ptr inliers{new pcl::PointIndices};
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+  seg.setOptimizeCoefficients(true);
+  // Use perpendicular plane model so setAxis/setEpsAngle takes effect; plain PLANE ignores axis constraint.
+  seg.setModelType(pcl::SACMODEL_PERPENDICULAR_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setMaxIterations(max_iterations);
+  seg.setDistanceThreshold(distance_thresh);
+  seg.setAxis(Eigen::Vector3f::UnitZ());
+  seg.setEpsAngle(ground_normal_angle_thresh_rad);
+  RCLCPP_INFO(logger, "Ground segmentation with normal angle threshold: %f", ground_normal_angle_thresh_rad);
   // Segment the largest planar component from the input cloud
   seg.setInputCloud(cloud);
   seg.segment(*inliers, *coefficients);

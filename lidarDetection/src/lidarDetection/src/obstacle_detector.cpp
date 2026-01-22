@@ -45,6 +45,7 @@ double STATISTICAL_STD_RATIO;
 
 bool ENABLE_HEIGHT_RANGE_FILTER;
 double GROUND_DISTANCE_THRESH;
+double UNDER_GROUND_DISTANCE_THRESH;
 double MIN_HEIGHT_AND_LONGEST_EDGE_RATIO;
 double BOX_MAX_LENGTH_THRESHOLD;
 
@@ -147,7 +148,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   MIN_POINT = Eigen::Vector4f(min_x, min_y, min_z, 1.0f);
   MAX_POINT = Eigen::Vector4f(max_x, max_y, max_z, 1.0f);
 
-  RCLCPP_INFO(this->get_logger(), "Obstacle Detector Node Started");
+  // RCLCPP_INFO(this->get_logger(), "Obstacle Detector Node Started");
 
   // Initialize detector
   obstacle_id_ = 0;
@@ -217,6 +218,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
   this->declare_parameter<double>("range_length", 5.0);
   this->declare_parameter<double>("range_width", 5.0);
   this->declare_parameter<double>("ground_distance_threshold", 1.8);
+  this->declare_parameter<double>("under_ground_distance_threshold", 0.0);
   this->declare_parameter<double>("min_height_and_longest_edge_ratio", 0.1);
   this->declare_parameter<double>("box_max_length_threshold", 3.0);
   this->declare_parameter<bool>("enable_wall_segmentation", true);
@@ -260,6 +262,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
 
   this->get_parameter("enable_height_range_filter", ENABLE_HEIGHT_RANGE_FILTER);
   this->get_parameter("ground_distance_threshold", GROUND_DISTANCE_THRESH);
+  this->get_parameter("under_ground_distance_threshold", UNDER_GROUND_DISTANCE_THRESH);
   this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
   this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
@@ -319,6 +322,7 @@ ObstacleDetectorNode::ObstacleDetectorNode() : rclcpp::Node("obstacle_detector")
 
       this->get_parameter("enable_height_range_filter", ENABLE_HEIGHT_RANGE_FILTER);
       this->get_parameter("ground_distance_threshold", GROUND_DISTANCE_THRESH);
+      this->get_parameter("under_ground_distance_threshold", UNDER_GROUND_DISTANCE_THRESH);
       this->get_parameter("min_height_and_longest_edge_ratio", MIN_HEIGHT_AND_LONGEST_EDGE_RATIO);
       this->get_parameter("box_max_length_threshold", BOX_MAX_LENGTH_THRESHOLD);
 
@@ -346,7 +350,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
   // Convert ROS2 PointCloud2 to PCL point cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
-  RCLCPP_INFO(logger, "Raw points: %zu", raw_cloud->size());
+  // RCLCPP_INFO(logger, "Raw points: %zu", raw_cloud->size());
 
   if (raw_cloud->empty()) {
     RCLCPP_WARN(logger, "Raw cloud is empty, skipping processing");
@@ -408,7 +412,9 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::msg::PointClou
 
     } else {
       RCLCPP_INFO(logger, "Using RANSAC for ground segmentation only");
-      auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
+      // auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
+      auto segmented_clouds =
+        obstacle_detector->segmentGround(filtered_cloud, 30, GROUND_THRESH, GROUND_NORMAL_ANGLE_THRESH_RAD);
       segmented_clouds_ptr.first = segmented_clouds.first;
       segmented_clouds_ptr.second = segmented_clouds.second;
     }
@@ -757,6 +763,14 @@ bool ObstacleDetectorNode::applyHeightAndRangeFilter(const Box & box)
     RCLCPP_INFO(
       this->get_logger(), "Filter box(id=%d): bottom_z %.2f > ground_distance_thresh %.2f", box.id, bottom_z,
       GROUND_DISTANCE_THRESH);
+    return true;
+  }
+
+  const float top_z = box.position(2) + h / 2.0f;
+  if (top_z < static_cast<float>(UNDER_GROUND_DISTANCE_THRESH)) {
+    RCLCPP_INFO(
+      this->get_logger(), "Filter box(id=%d): top_z %.2f < under_ground_distance_thresh %.2f", box.id, top_z,
+      UNDER_GROUND_DISTANCE_THRESH);
     return true;
   }
 

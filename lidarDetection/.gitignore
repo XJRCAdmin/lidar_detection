@@ -3,3 +3,4 @@ build
 log
 log/*
 install
+lidarDetection/src/Point_LIO_pre.zip
