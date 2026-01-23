@@ -38,8 +38,10 @@
             fov_degree: 360.0
             det_range: 100.0
             gravity_align: true # true to align the z axis of world frame with the direction of gravity, and the gravity direction should be specified below
-            gravity: [2.209989, 0.234393, -9.568671] # [0.0, 9.810, 0.0] # gravity to be aligned
-            gravity_init: [2.209989, 0.234393, -9.568671]  # [0.0, 9.810, 0.0] # # preknown gravity in the first IMU body frame, use when imu_en is false or start from a non-stationary state
+            gravity: [0.0,0.0,-9.810]
+            gravity_init: [0.0,0.0,-9.810]
+            # gravity: [2.214, 0.107, -9.754] # [0.0, 9.810, 0.0] # gravity to be aligned
+            # gravity_init: [2.214, 0.107, -9.754] # [0.0, 9.810, 0.0] # # preknown gravity in the first IMU body frame, use when imu_en is false or start from a non-stationary state
             extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
             extrinsic_R: [ 1.0, 0.0, 0.0,
                            0.0, 1.0, 0.0,
@@ -51,9 +53,9 @@
         publish:
             path_en: true                 # false: close the path output
             scan_publish_en: true         # false: close all the point cloud output
-            scan_bodyframe_pub_en: false  # true: output the point cloud scans in IMU-body-frame
+            scan_bodyframe_pub_en: true  # true: output the point cloud scans in IMU-body-frame , /cloud_registered_body will be published
 
         pcd_save:
-            pcd_save_en: true
+            pcd_save_en: true               # true: enable the pcd saving function
             interval: -1                 # how many LiDAR frames saved in each pcd file;
             # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.

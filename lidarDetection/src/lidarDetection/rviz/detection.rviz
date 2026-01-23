@@ -49,7 +49,7 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 30
+      Plane Cell Count: 40
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz_default_plugins/MarkerArray
@@ -295,30 +295,29 @@ Visualization Manager:
         Value: /static_obstacle_markers_in_map
       Value: true
     - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
+      Enabled: false
       Name: DynamicArrayMarker
       Namespaces:
-        dynamic_obstacle_text: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /dynamic_obstacle_text_in_map
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
+      Enabled: false
       Name: DynamicTestMarker
       Namespaces:
-        dynamic_obstacle_bboxes: true
-        dynamic_obstacle_velocity: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /dynamic_obstacle_array_in_map
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -436,7 +435,7 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 161
+      Max Intensity: 162.7142791748047
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: Map
@@ -459,7 +458,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: map
-    Frame Rate: 40
+    Frame Rate: 50
   Name: root
   Tools:
     - Class: rviz_default_plugins/Interact
@@ -501,25 +500,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 24.93646812438965
+      Distance: 23.3673152923584
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.1503766030073166
-        Y: 1.8966987133026123
-        Z: 0.23544380068778992
+        X: 7.721351623535156
+        Y: 1.138426423072815
+        Z: 2.15023136138916
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.40979647636413574
+      Pitch: 0.20479656755924225
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.824193000793457
+      Yaw: 3.45918345451355
     Saved: ~
 Window Geometry:
   Displays:
@@ -535,5 +534,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1662
-  X: 679
-  Y: 71
+  X: 848
+  Y: 131

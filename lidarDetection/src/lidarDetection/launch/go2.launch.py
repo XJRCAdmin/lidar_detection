@@ -53,6 +53,18 @@ def generate_launch_description():
         ]
     )
 
+    # static_tf_map_to_odom = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='map_to_odom_publisher',
+    #     output='screen',
+    #     arguments=[
+    #     '-1.0329', '0.0', '0.4066',    # New Translation: x, y, z
+    #     '0.0', '0.191986', '0.0',     # New Rotation: yaw, pitch, roll
+    #     'map', 'odom'  
+    #     ]
+    # )
+
     obstacle_detector_node = Node(
         package='lidar_detection',
         executable='obstacle_detector_node',

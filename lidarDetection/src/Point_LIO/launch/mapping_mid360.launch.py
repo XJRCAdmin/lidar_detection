@@ -66,16 +66,4 @@ def generate_launch_description():
         ),
     ])
 
-    lidar_body_to_livox_frame = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='lidar_body_to_livox_frame_publisher',
-        output='screen',
-        arguments=[
-            # x, y, z, roll, pitch, yaw, parent_frame, child_frame
-            '0', '0', '0', '0', '0', '0', 'lidar_body', 'livox_frame'
-        ]
-    )
-
-
     return ld

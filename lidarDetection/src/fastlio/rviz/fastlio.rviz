@@ -81,6 +81,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /Odometry
@@ -108,6 +109,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /path
@@ -115,8 +117,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 5.045539855957031
-        Min Value: -0.9027721881866455
+        Max Value: 4.703677654266357
+        Min Value: -1.9488322734832764
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -139,6 +141,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /cloud_registered
@@ -172,6 +175,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /cloud_effected
@@ -181,8 +185,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 6.07037878036499
-        Min Value: -2.341080665588379
+        Max Value: 7.0200886726379395
+        Min Value: -3.164689779281616
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -205,6 +209,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /Laser_map
@@ -226,6 +231,9 @@ Visualization Manager:
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
     - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -254,7 +262,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 258.1055603027344
+      Distance: 37.84160614013672
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -269,10 +277,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 0.5047961473464966
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 4.88355827331543
+      Yaw: 0.7985426187515259
     Saved: ~
 Window Geometry:
   Displays:
@@ -288,5 +296,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1453
-  X: 937
-  Y: 373
+  X: -423
+  Y: 366

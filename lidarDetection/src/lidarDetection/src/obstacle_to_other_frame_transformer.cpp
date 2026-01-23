@@ -307,6 +307,14 @@ public:
     }
   }
 
+  /**
+   * @brief 将障碍物边界框对齐到坐标轴方向
+   * 
+   * 此函数遍历障碍物检测数组，将每个检测到的边界框重新对齐为轴向对齐的包围盒，
+   * 通过计算原边界框8个角点在世界坐标系中的位置，然后构造一个新的轴向对齐的包围盒
+   * 
+   * @param obstacle_msg_Array 包含多个障碍物检测结果的消息数组，函数会就地修改这些检测结果
+   */
   void AlignObstacleToFrame(lidar_detection::msg::ObstacleDetectionArray & obstacle_msg_Array)
   {
     for (auto & detection_msg : obstacle_msg_Array.detections) {

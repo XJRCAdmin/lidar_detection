@@ -7,7 +7,7 @@
         filter_size_map: 0.5
         cube_side_length: 1000.0
         runtime_pos_log_enable: false
-        map_file_path: "./lidarDetection/src/fastlio/PCD"
+        map_file_path: "/home/rc/go2/lidarDetection/src/fastlio/PCD/save_map.pcd"
 
         common:
             lid_topic:  "/livox/lidar"

@@ -63,6 +63,16 @@ public:
   }
   ~PcdMapPublisher() = default;
 
+  /**
+   * @brief 从PCD文件加载点云数据到ROS2消息
+   * 
+   * 该函数从指定路径加载PCD格式的点云文件，将其转换为sensor_msgs::msg::PointCloud2格式
+   * 如果加载失败，则记录错误日志并返回false
+   * 
+   * @param path PCD文件的路径
+   * @param msg 输出的ROS2点云消息
+   * @return 成功返回true，失败返回false
+   */
   bool loadPcdToMsg(const std::string & path, sensor_msgs::msg::PointCloud2 & msg)
   {
     pcl::PCLPointCloud2 cloud2;
