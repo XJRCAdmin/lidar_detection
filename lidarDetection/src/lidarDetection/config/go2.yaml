@@ -1,0 +1,114 @@
+# Obstacle Detector Node 参数配置
+obstacle_detector_node:
+  ros__parameters:
+    lidar_points_topic: "/cloud_registered_body"
+    odom_topic: "/Odometry"
+    cloud_ground_topic: "/cloud_ground"
+    cloud_clusters_topic: "/cloud_clusters"
+    marker_bboxes_topic: "/marker_bboxes"
+    objects_topic: "/detected_objects"
+    bbox_target_frame: "lidar_body"
+    
+    # 滤去自身点云,不需要太多调整
+    min_x: -0.02
+    min_y: -0.02
+    min_z: -0.02
+    max_x: 0.02
+    max_y: 0.02
+    max_z: 0.02
+    
+    # LiDAR相对于robot的安装位置和姿态,也可以改launch中的参数,一百次用不到一次
+    rotate_x: 0.0        # X轴平移 (米) - 前后位置, 范围: [-10, 10]
+    rotate_y: 0.0        # Y轴平移 (米) - 左右位置, 范围: [-10, 10]
+    rotate_z: 0.0        # Z轴平移 (米) - 高度, 范围: [-10, 10]
+    rotate_roll: 0.0     # 横滚角 (弧度) - 绕X轴旋转, 范围: [-3.14, 3.14]
+    rotate_pitch: 0.0    # 俯仰角 (弧度) - 绕Y轴旋转, 范围: [-3.14, 3.14]
+    rotate_yaw: 0.0      # 偏航角 (弧度) - 绕Z轴旋转, 范围: [-3.14, 3.14]
+    
+    use_pca_box: true          # 使用PCA边界框 (vs 轴对齐边界框)
+    use_tracking: true         # 启用目标跟踪功能
+    
+    voxel_grid_size: 0.1       # 体素网格大小 (米) - 点云下采样分辨率, 范围: [0.05, 1.0],尽量小一些,在0.1~0.2之间效果好一些
+    
+    # 只检测该区域内的点云, 调大会导致墙体一起被纳入,关键参数,决定了局部的检测视场
+    roi_max_x: 2.5       # point1前方 (米), 范围: [0.0, 8.0]
+    roi_max_y: 0.8       # point1左侧 (米), 范围: [0.0, 8.0]
+    roi_max_z: 1.3      # point1向上 (米), 范围: [0.0, 3.0]
+    roi_min_x: -3.0      # point2后方 (米) - 负值, 范围: [-8.0, 0.0]
+    roi_min_y: -0.8      # point2右侧 (米) - 负值, 范围: [-8.0, 0.0]
+    roi_min_z: -0.3      # point2向下 (米) - 负值, 范围: [-1.0, 0.0]
+    
+    ground_segment: "RANSAC"   # 地面分割算法类型
+    ground_threshold: 0.25      # 地面高度阈值 (米) - 地面平面的容差, 范围: [0.0, 1.0]
+    
+    # 可以调节这些参数来优化聚类效果
+    cluster_threshold: 0.2     # 聚类距离阈值 (米) - 点间最大距离, 范围: [0.1, 3.0] ，不得小于voxel_grid_size
+    cluster_max_size: 80      # 聚类最大点数 - 单个障碍物最大点数, 范围: [10, 2000]
+    cluster_min_size: 6       # 聚类最小点数 - 过滤小噪声, 范围: [3, 50] 关键参数,如果不修改过滤和点云发布频率,那么对于人而言,近距离所被扫到的点云数量不超过40
+    
+    # 可以设置大一些, 以免漏检
+    displacement_threshold: 2.0   # 位移阈值 (米) - 帧间最大移动距离, 范围: [0.1, 5.0]
+    iou_threshold: 1.0            # IoU阈值 - 边界框重叠度匹配越大越宽松, 范围: [0.1, 1.0] 不宜过小,过小导致相邻两帧的bbox匹配不上
+    
+    # 可以适当调节, 影响离群点滤波效果
+    enable_statistical_filter: true     # 启用统计离群点滤波
+    statistical_nb_neighbors: 20        # 邻居点数量 - 统计分析的近邻点数, 范围: [10, 100]
+    statistical_std_ratio: 1.0          # 标准差倍数 - 离群点判定阈值 (越小越严格), 范围: [0.1, 4.0]
+    
+    # 用于过滤异常长宽高比例的bbox 未启用
+    max_dimension_ratio: 5.0     # 边界框最大长宽高比例 (最长边/最短边), 范围: [5.0, 10.0]
+    
+    # 用于过滤过高或过远的 bbox
+    enable_height_range_filter: true   # 启用高度和范围滤波
+    ground_distance_threshold: 1.5  # 过滤高于该高度的 obstacle bbox
+    under_ground_distance_threshold: 0.2  # 过滤最高高度低于该高度的 obstacle bbox
+    min_height_and_longest_edge_ratio: 0.10          # bbox的"最小高度"与最长边的比例, 若最长边比高度的比值大很多,则滤去bbox，这个比例就是阈值
+    box_max_length_threshold: 3.0        # bbox最大长度阈值 (米)
+
+    enable_wall_segmentation: false  # 是否启用墙体分割 未稳定 不要启用
+    wall_distance_threshold: 0.1  # 当点到拟合出的墙壁平面的距离小于此阈值时，该点才会被归类为墙壁点
+    ground_normal_angle_thresh_rad: 0.10   # 地面法向量与Z轴最大夹角 地面法向量与Z轴的最大允许夹角 弧度制
+    wall_normal_angle_thresh_rad: 0.10     # 墙面法向量与XY平面最大夹角 弧度制
+
+odom_trans_node:
+  ros__parameters:
+    input_odom_topic: "/Odometry"
+    output_odom_topic: "/odom_base_link"
+    source_frame: "lidar_body"
+    target_frame: "base_link" 
+
+obstacle_to_other_frame_node:
+  ros__parameters:
+    static_velocity_thresh: 0.2  # 静止速度阈值 (米/秒), 低于该速度的障碍物被视为静止
+    AlignObstacleToFrame: true  # 是否将障碍物对齐到目标坐标系
+    obstacle_lidar_topic: "/detected_objects"
+    dynamic_obstacle_baselink_topic: "/dynamic_obstacle_in_baselink"
+    static_obstacle_baselink_topic: "/static_obstacle_in_baselink"
+    source_frame: "lidar_body"
+    target_frame: "base_link"
+    smoothing_alpha: 0.7              # 平滑系数 [0,1]
+    match_position_thresh: 0.5        # 位置匹配阈值(米)
+    match_size_ratio_thresh: 0.3      # 尺寸差异阈值
+    visualization_mode: "map"  # bbox在哪一个坐标系下对齐并且显示 "baselink" or "map" or "lidar_body"
+    
+
+interface_node:
+  ros__parameters:
+    input_topic_odom: "/odom_base_link"
+    output_topic_robot_state: "/robot_state"
+    input_relative_ball_topic: "/dynamic_obstacle_in_baselink"
+    output_relative_ball_topic: "/ball_relative"
+    input_static_obstacle_topic: "/static_obstacle_in_baselink"
+    output_static_obstacle_topic: "/static_baselink_obstacle"
+    input_map_ball_topic: "/dynamic_obstacle_in_baselink"
+    output_map_ball_topic: "/ball_map"
+    source_frame: "base_link"
+    target_frame: "base_link"
+    robot_radius: 0.5  # robot 半径 (米)
+
+map_launcher_node:
+  ros__parameters:
+    frame_id: "map"  # 取巧的方法,直接用 base_link ，目前不用取巧了。
+    pcd_file_path: "/home/rc/go2/lidarDetection/src/lidarDetection/pcd/justify/grass1-ball-chuo.pcd"
+    output_topic: "/global_map"
+    repeat_sec: 1.0

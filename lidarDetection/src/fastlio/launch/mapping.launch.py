@@ -77,6 +77,6 @@ def generate_launch_description():
     ld.add_action(declare_rviz_config_path_cmd)
     ld.add_action(lidar_body_to_livox_frame)
     ld.add_action(fast_lio_node)
-    # ld.add_action(rviz_node)
+    ld.add_action(rviz_node)
 
     return ld
