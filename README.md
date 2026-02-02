@@ -1,6 +1,12 @@
 # ROS2 lidarDetection package
-
 `foxy, ubuntu 20.04` and `humble ubuntu 22.04` are supported.for humble see 'humble' branch.
+## TODO
+- [ ] 完善README
+
+
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/8f529ec4-a3c2-4c4d-8a57-bd930af39ada" width="100%" controls></video>
+</div>
 
 在workspace(不是`lidarDetection/`目录)下运行:
 ```
