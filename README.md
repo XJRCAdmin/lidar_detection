@@ -7,9 +7,11 @@
 <div align="center">
   <video src="https://github.com/user-attachments/assets/8f529ec4-a3c2-4c4d-8a57-bd930af39ada" width="100%" controls></video>
 </div>
-
-在workspace(不是`lidarDetection/`目录)下运行:
+## Usage
 ```
+git clone https://github.com/XJRCAdmin/lidar_detection.git -b humble
+cd lidar_detection
+git submodule update --init  --recursive
 colcon build --symlink-install
 ```
 
