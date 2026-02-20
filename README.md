@@ -20,7 +20,7 @@
 > [!NOTE]  
 > This Repository is supported for `humble ubuntu 22.04`, more precisely, it has been tested on `x86_64` architecture. For `foxy ubuntu 20.04`(has not been finished yet), please see the `foxy` branch.
 
-This repository contains the implementation of a LiDAR-and-camera-based obstacle detection system. The complete detection system includes a YOLO–RealSense 2D detector and a geometry-based bounding box LiDAR obstacle detector, which is designed to detect and classify obstacles in real time using LiDAR data (currently only supporting Mid360) and visual information. All perception-related code and the file structure of Uerebot can be found here: [uerebot perception code](https://github.com/XJRCAdmin/lidar_detection).
+This repository contains the implementation of a LiDAR-and-camera-based obstacle detection system. The complete detection system includes a YOLO–RealSense 2D detector and a geometry-based bounding box LiDAR obstacle detector, which is designed to detect and classify obstacles in real time using LiDAR data (currently only supporting **Mid360**) and visual information. All perception-related code and the file structure of Uerebot can be found here: [uerebot perception code](https://github.com/XJRCAdmin/lidar_detection).
 
 `./lidar_detection/src/lidarDetection` folder is a ROS 2 package for LiDAR-based obstacle detection, including a Mid360-based LiDAR obstacle detector with the following features:
 
@@ -39,7 +39,7 @@ And the whole system is shown in the following video:
 - [ ] A more robust ground segmentation algorithm 
 - [ ] Improve foxy branch
 
-# whole Perception system
+# Whole Perception system(This repository)
 ## Lidar Obstacle Detection Part
 ```
 git clone https://github.com/XJRCAdmin/lidar_detection.git -b humble
@@ -54,7 +54,12 @@ Then, you can build the package using the following command:
 
 ```
 colcon build --symlink-install
+ros2 launch lidar_detection go2.launch.py
 ```
+For more information about the lidar obstacle detection part, such as the parameters setting , pipeline and file illustration, please refer to the [./lidarDetection README](lidarDetection/README.md).
+
+### rqt Graph
+![](lidarDetection\src\lidarDetection\static\rqt2.png)
 
 ## Yolo-RealSense 2D Detection Part
 ```
@@ -85,36 +90,22 @@ run the following command to launch the yolo_realsense package:
 ```
 ros2 launch yolo_realsense camera_yolo.launch.py
 ```
+For more information about the yolo_realsense part, such as the parameters setting, please refer to the [yolo_realsense README](./realsense/yolo_realsense/README.md).
+
+## Interface Folder
+The message topic interfaces with downstream modules use custom-defined message formats. These formats are specific to the Uerebot project and do not have general reference value.
 
 
-## 记录rosbag
+## Record rosbag
 
 ```bash
-ros2 bag record -s mcap -a -o my_mcap_bag
+ros2 bag record -s mcap -a -o my_lidar_bag # record all topics to my_lidar_bag.mcap
 
 ```
+## Development Log 
 - [lidarDetection README](lidarDetection/README.md)
 - [CHANGELOG](lidarDetection/CHANGELOG.md)
 - [yolo_realsense README](realsense/yolo_realsense/README.md)
 
 # Acknowledgement
-[lidar_obstacle_detector](https://github.com/SS47816/lidar_obstacle_detector)
-
-
-
-
-
-
-
-# Installation and Usage 
-```
-# clone the repo
-cd <your_workspace>/src
-git clone https://github.com/XJRCAdmin/lidar_detection.git
-
-cd ..
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
-source install/setup.bash
-ros2 launch lidar_detection go2.launch.py
-```
+- [lidar_obstacle_detector](https://github.com/SS47816/lidar_obstacle_detector)

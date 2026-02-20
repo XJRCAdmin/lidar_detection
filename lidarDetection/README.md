@@ -1,7 +1,30 @@
 # lidar Detection
 
-`foxy,ubuntu 20.04`
+> [!TIP]
+> humble,ubuntu 22.04
 
+## File structure
+```
+lidarDetection
+├── src
+│   ├── lidarDetection
+|   |        |── config
+|   |        |     └── go2.yaml # important parameters for tuning the algorithm.
+|   |        |── launch
+|   |        |     └── go2.launch.py # launch file for lidar obstacle detection.
+|   |        |── src
+|   |        |     └── obstacle_detector.cpp # the main node for lidar obstacle detection, including point cloud pre-processing, clustering and obstacle information publishing.
+|   |        |── include
+|   |        |     |── ukf.hpp # header file for ukf.cpp, which implements the unscented kalman filter for obstacle tracking,some parameters of kalman filter can be tuned in it.
+|   |        |     └── obstacle_detector.hpp # header file for obstacle_detector.cpp.
+|   |        |
+|   |        |── static
+|   |── fastlio
+|   |── lidarSORT # Original version of lidar detection , Currently unavailable to use.
+|   |── livox_ros_driver2
+|   |── Point_LIO
+
+```
 Lidar点云障碍物检测,并发布障碍物位置话题.
 ![](src/lidarDetection/static/rviz.png)
 ## dependency
