@@ -1,3 +1,20 @@
+<div align="center">
+
+<img src="img/lidar-detection.png" alt="lidar-detection" width="60%"/>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README_ZH.md">中文</a>
+</p>
+
+[![License](https://img.shields.io/badge/License-CC%20BY%204.0-blue?style=for-the-badge)](https://creativecommons.org/licenses/by/4.0/)
+[![Static Badge](https://img.shields.io/badge/arXiv-2602.07363-red?style=for-the-badge&logo=arxiv)](https://arxiv.org/abs/2602.07363)
+![Static Badge](https://img.shields.io/badge/c%2B%2B-%2300599C?style=for-the-badge&logo=cplusplus&logoColor=white)
+![Static Badge](https://img.shields.io/badge/ROS2-Humble-orange?style=for-the-badge&logo=ROS)
+![Static Badge](https://img.shields.io/badge/Lidar-Mid360-blue?style=for-the-badge&logo=radar)
+
+</div>
+
+
 # 概览
 
 > [!NOTE]
@@ -112,3 +129,13 @@ ros2 launch yolo_realsense camera_yolo.launch.py
 **答**：尽管基于学习的 3D 激光雷达检测方法（如 PointPillars、CenterPoint）在自动驾驶基准上表现优异，但将它们部署到像 Uerebot 这样的四足机器人上，会带来显著的领域差异与工程瓶颈。
 首先，在 KITTI 或 nuScenes 等数据集上训练的模型高度适配车顶旋转式激光雷达的水平扫描模式，难以泛化到 Mid360 这种非重复、密集玫瑰花瓣式扫描模式以及贴近地面的视角。
 其次，基于学习的方法通常是闭集的，关注预定义类别（例如车辆、行人）。而我们的四足机器人需要避让开放世界中、不规则的几何障碍（例如岩石、散落箱子、低台阶）——这类目标很难通过有限类别的学习模型覆盖。
+
+## 部署记录 
+- [lidarDetection README](lidarDetection/README.md)
+- [CHANGELOG](lidarDetection/CHANGELOG.md)
+- [yolo_realsense README](realsense/yolo_realsense/README.md)
+
+# 致谢
+- [lidar_obstacle_detector](https://github.com/SS47816/lidar_obstacle_detector)
+- [FAST-LIO](https://github.com/hku-mars/FAST_LIO)
+- [Point-LIO](https://github.com/hku-mars/Point-LIO)
