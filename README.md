@@ -58,10 +58,10 @@ Then, you can build the package using the following command:
 colcon build --symlink-install
 ros2 launch lidar_detection go2.launch.py
 ```
-For more information about the lidar obstacle detection part, such as the parameters setting , pipeline and file illustration, please refer to the [./lidarDetection README](lidarDetection/README.md).
+For more information about the lidar obstacle detection part, such as the parameters setting , pipeline and file illustration, please refer to the [lidarDetection README](lidarDetection/README.md).
 
 ### rqt Graph
-![](./lidarDetection/src/lidarDetection/static/rqt2.png)
+![](./lidarDetection/src/lidarDetection/static/nodes.png)
 
 ## Yolo-RealSense 2D Detection Part
 ```
