@@ -20,7 +20,7 @@
 > [!NOTE]  
 > This Repository is supported for `humble ubuntu 22.04`, more precisely, it has been tested on `x86_64` architecture. For `foxy ubuntu 20.04`(has not been finished yet), please see the `foxy` branch.
 
-This repository contains the implementation of a LiDAR-and-camera-based obstacle detection system. The complete detection system includes a YOLO–RealSense 2D detector and a geometry-based bounding box LiDAR obstacle detector, which is designed to detect and classify obstacles in real time using LiDAR data (currently only supporting **Mid360**) and visual information. All perception-related code and the file structure of Uerebot can be found here: [uerebot perception code](https://github.com/XJRCAdmin/lidar_detection).
+This repository contains the implementation of a LiDAR-and-camera-based obstacle detection system. The complete detection system includes a YOLO–RealSense 2D detector and a geometry-based bounding box LiDAR obstacle detector, which is designed to detect and classify obstacles in real time using LiDAR data (currently only supporting **Mid360**) and visual information. All perception-related code and the file structure of four legged robot 'Uerebot' can be found here: [uerebot perception code](https://github.com/XJRCAdmin/lidar_detection).
 
 `./lidar_detection/src/lidarDetection` folder is a ROS 2 package for LiDAR-based obstacle detection, including a Mid360-based LiDAR obstacle detector with the following features:
 
@@ -40,6 +40,8 @@ And the whole system is shown in the following video:
 - [ ] Improve foxy branch
 
 # Whole Perception system(This repository)
+You can use only lidar_detection package(see `./lidarDetection/src/lidarDetection`) to detect obstacles using LiDAR data , or you can use the whole perception system, which includes both the LiDAR obstacle detection and the YOLO-RealSense 2D detection. Based on our experiments and deployment experience, we adopted a decoupled perception approach that separates LiDAR and camera processing.The two parts are independent of each other, and you can choose to use either one of them or both of them according to your needs.
+
 ## Lidar Obstacle Detection Part
 ```
 git clone https://github.com/XJRCAdmin/lidar_detection.git -b humble
@@ -95,13 +97,21 @@ For more information about the yolo_realsense part, such as the parameters setti
 ## Interface Folder
 The message topic interfaces with downstream modules use custom-defined message formats. These formats are specific to the Uerebot project and do not have general reference value.
 
+## Questions and Answers
 
-## Record rosbag
+**Q**: Why not using a fusion scheme that combines LiDAR and camera data for obstacle detection, instead of separating them into two independent pipelines?
 
-```bash
-ros2 bag record -s mcap -a -o my_lidar_bag # record all topics to my_lidar_bag.mcap
+**A**: Some reason of separating Lidar and RealSense camera perception parts are as follows:
+- Due to computational bottlenecks on the edge computing platform and stringent real-time system requirements(Nvidia Jetson), the overall perception frame rate (FPS) experienced an unacceptable degradation. In addition, message buffer queue management and timestamp synchronization became problematic.
+- The quadruped robot’s inherent high-frequency vibrations, together with reflection-induced artifacts, led to odometry drift in FAST-LIO and Point-LIO (i.e., point cloud drift), which in turn caused fusion-based registration to fail and resulted in spatial misalignment.
+- The cost-effectiveness of perception FOV was also a key consideration. Although the Mid360 provides full 360° coverage, the forward-facing RealSense camera offers only about 80°–90° horizontal FOV. A fusion scheme would therefore deliver high-confidence data only in the frontal sector, while the remaining 270° still requires an independent LiDAR-only geometric pipeline. This hybrid “semi-fusion, semi-decoupled” architecture imposes additional computational overhead on edge devices—running YOLO, a forward fusion node, and a separate omnidirectional LiDAR thread simultaneously. Instead of maintaining such a fragmented system, a fully decoupled design that maximizes the Mid360’s omnidirectional geometric advantages is more efficient and pragmatic.
 
-```
+**Q**:Why not using learning based LiDAR detection methods?
+
+**A**: While learning-based 3D LiDAR detection methods (such as PointPillars or CenterPoint) show state-of-the-art performance on autonomous driving benchmarks, deploying them on a legged robot like Uerebot introduces significant domain gaps and engineering bottlenecks.
+First, models trained on datasets like KITTI or nuScenes heavily overfit to the horizontal scan patterns of roof-mounted spinning LiDARs. They struggle to generalize to the non-repetitive, dense rosette scanning pattern and the low-to-the-ground viewpoint of the Livox Mid360.
+Second, learning-based methods are typically closed-set, focusing on predefined classes (cars, pedestrians). Our quadruped needs to avoid open-world, irregular geometric obstacles (e.g., rocks, scattered boxes, low steps).
+
 ## Development Log 
 - [lidarDetection README](lidarDetection/README.md)
 - [CHANGELOG](lidarDetection/CHANGELOG.md)

@@ -42,3 +42,9 @@
 source xxx/install/setup.bash
 ros2 bag record -s mcap -a --exclude "/integrated_joy" -o flat-c2-fix-map-lidar
 ```
+
+## Record rosbag
+
+```bash
+ros2 bag record -s mcap -a -o my_lidar_bag # record all topics to my_lidar_bag.mcap
+```
