@@ -120,4 +120,4 @@ Second, learning-based methods are typically closed-set, focusing on predefined 
 # Acknowledgement
 - [lidar_obstacle_detector](https://github.com/SS47816/lidar_obstacle_detector)
 - [FAST-LIO](https://github.com/hku-mars/FAST_LIO)
-- [Point-LIO](https://github.com/hku-mars/Point-LIO)
+- [Point-LIO](https://github.com/dfloreaa/point_lio_ros2)
